@@ -10,7 +10,7 @@ fn main() {
     io::stdin().read_line(&mut input).expect("Expected input.");
 
     let mut t = Tokenizer::new(&input).unwrap();
-    println!("{:?}", t.tokens);
+    println!("{:?}\n", t.tokens);
     let ast = parser::parse(&mut t).unwrap();
     println!("{}", ast.pretty());
 }
