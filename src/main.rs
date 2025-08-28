@@ -12,5 +12,5 @@ fn main() {
     let mut t = Tokenizer::new(&input).unwrap();
     println!("{:?}", t.tokens);
     let ast = parser::parse(&mut t).unwrap();
-    println!("{}", ast.pretty_tree());
+    println!("{}", ast.pretty());
 }

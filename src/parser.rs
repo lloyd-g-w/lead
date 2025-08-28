@@ -52,22 +52,7 @@ impl fmt::Display for Expr {
 }
 
 impl Expr {
-    pub fn pretty(&self, indent: usize) -> String {
-        let pad = "  ".repeat(indent);
-        match self {
-            Expr::Literal(lit) => format!("{pad}Literal({lit:?})"),
-            Expr::Group(expr) => format!("{pad}Group(\n{}\n{pad})", expr.pretty(indent + 1)),
-            Expr::Prefix { op, expr } => {
-                format!("{pad}Prefix({op:?}\n{}\n{pad})", expr.pretty(indent + 1))
-            }
-            Expr::Infix { op, lhs, rhs } => format!(
-                "{pad}Infix({op:?}\n{}\n{}\n{pad})",
-                lhs.pretty(indent + 1),
-                rhs.pretty(indent + 1)
-            ),
-        }
-    }
-    pub fn pretty_tree(&self) -> String {
+    pub fn pretty(&self) -> String {
         // entry point for users — root printed without └──
         let mut result = String::new();
         result.push_str(&format!("{}\n", self.node_name()));
