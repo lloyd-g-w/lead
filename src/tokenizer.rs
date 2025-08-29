@@ -12,6 +12,7 @@ pub enum Token {
     Literal(Literal),
     Operator(char),
     Paren(char),
+    Comma,
     Eof,
 }
 
@@ -84,11 +85,14 @@ impl Tokenizer {
                     string.push(ch);
                 }
                 tokens.push(Token::Literal(Literal::String(string)));
-            } else if "+-*/^".contains(c) {
+            } else if "+-*/^!%&|".contains(c) {
                 tokens.push(Token::Operator(c));
                 chars.next();
             } else if "()".contains(c) {
                 tokens.push(Token::Paren(c));
+                chars.next();
+            } else if c == ',' {
+                tokens.push(Token::Comma);
                 chars.next();
             } else {
                 return Err(format!("Encountered unknown token char: {c}"));
