@@ -1,19 +1,19 @@
-use crate::tokenizer::*;
+use crate::{cell::CellRef, tokenizer::*};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum PrefixOp {
     POS,
     NEG,
     NOT,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum PostfixOp {
     PERCENT,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum InfixOp {
     MUL,
     DIV,
@@ -23,10 +23,10 @@ pub enum InfixOp {
     OR,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Literal(Literal),
-    CellRef(String),
+    CellRef(CellRef),
     Function {
         name: String,
         args: Vec<Expr>,
@@ -86,7 +86,7 @@ impl fmt::Display for Expr {
             Expr::Postfix { op, expr } => write!(f, "({op:?} {expr})"),
             Expr::Infix { op, lhs, rhs } => write!(f, "({lhs} {op:?} {rhs})"),
             Expr::Function { name, args } => write!(f, "{name}({args:?})"),
-            Expr::CellRef(it) => write!(f, "CellRef({it})"),
+            Expr::CellRef(it) => write!(f, "{it:?}"),
         }
     }
 }
@@ -149,7 +149,7 @@ impl Expr {
             Expr::Postfix { op, .. } => format!("Postfix({:?})", op),
             Expr::Infix { op, .. } => format!("Infix({:?})", op),
             Expr::Function { name, .. } => format!("Function({:?})", name),
-            Expr::CellRef(it) => format!("CellRef({:?})", it),
+            Expr::CellRef(it) => format!("{:?}", it),
         }
     }
 }
@@ -218,7 +218,7 @@ pub fn _parse(input: &mut Tokenizer, min_prec: u8) -> Result<Expr, String> {
                     args: args,
                 }
             }
-            _ => Expr::CellRef(id),
+            _ => Expr::CellRef(CellRef::new(id)?),
         },
 
         it => return Err(format!("Parse error: did not expect token {:?}.", it)),
