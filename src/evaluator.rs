@@ -7,14 +7,12 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Eval {
     Literal(Literal),
-    Expr(Expr),
 }
 
 impl fmt::Display for Eval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Eval::Literal(lit) => write!(f, "{lit:?}"),
-            Eval::Expr(expr) => write!(f, "({expr})"),
         }
     }
 }
@@ -35,20 +33,26 @@ impl Evaluator {
             return Ok(());
         }
 
-        let mut eval: Option<Eval> = None;
+        let eval: Eval;
+
         if let Some(c) = raw_val.chars().nth(0)
             && c == '='
         {
-            if let Ok(e) = self.evaluate(raw_val[1..].to_owned()) {
-                eval = Some(e);
-            };
+            eval = self.evaluate(raw_val[1..].to_owned())?;
+        } else {
+            match self.evaluate(raw_val.to_owned()) {
+                Ok(e) => {
+                    eval = e;
+                }
+                Err(_) => eval = Eval::Literal(Literal::String(raw_val.to_owned())),
+            }
         }
 
         self.cells.insert(cell_ref, Cell::new(eval, raw_val));
         Ok(())
     }
 
-    pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<(String, Option<Eval>), String> {
+    pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<(String, Eval), String> {
         if !self.cells.contains_key(&cell_ref) {
             return Err(format!("Cell at {:?} not found.", cell_ref));
         }
@@ -58,14 +62,16 @@ impl Evaluator {
         Ok((cell.raw(), cell.eval()))
     }
 
-    pub fn evaluate(&self, str: String) -> Result<Eval, String> {
-        let mut expr = parse(&str)?;
+    pub fn evaluate(&mut self, str: String) -> Result<Eval, String> {
+        let (mut expr, mut deps) = parse(&str)?;
+
         self.evaluate_expr(&mut expr)
     }
 
-    fn evaluate_expr(&self, expr: &mut Expr) -> Result<Eval, String> {
+    fn evaluate_expr(&mut self, expr: &mut Expr) -> Result<Eval, String> {
         let res = match expr {
             Expr::Literal(lit) => Eval::Literal(lit.clone()),
+            Expr::CellRef(re) => self.get_cell(re.to_owned())?.1,
             Expr::Infix { op, lhs, rhs } => {
                 let lval = self.evaluate_expr(lhs)?;
                 let rval = self.evaluate_expr(rhs)?;
@@ -101,7 +107,6 @@ fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 
             Err("Evaluation error: expected string or numeric types for ADD function.".to_string())
         }
-        _ => return Err("Evalutation error: expected literals for ADD function.".to_string()),
     }
 }
 
@@ -114,7 +119,6 @@ fn eval_sub(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 
             Err("Evaluation error: expected string or numeric types for SUB function.".to_string())
         }
-        _ => return Err("Evalutation error: expected literals for SUB function.".to_string()),
     }
 }
 fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
@@ -126,7 +130,6 @@ fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 
             Err("Evaluation error: expected string or numeric types for MUL function.".to_string())
         }
-        _ => return Err("Evalutation error: expected literals for MUL function.".to_string()),
     }
 }
 fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
@@ -138,7 +141,6 @@ fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 
             Err("Evaluation error: expected string or numeric types for DIV function.".to_string())
         }
-        _ => return Err("Evalutation error: expected literals for DIV function.".to_string()),
     }
 }
 

@@ -4,13 +4,13 @@ use crate::evaluator::*;
 
 #[derive(Clone)]
 pub struct Cell {
-    eval: Option<Eval>,
+    eval: Eval,
     raw: String,
     deps: HashSet<CellRef>,
 }
 
 impl Cell {
-    pub fn new(eval: Option<Eval>, raw: String) -> Self {
+    pub fn new(eval: Eval, raw: String) -> Self {
         Self {
             eval,
             raw,
@@ -22,8 +22,20 @@ impl Cell {
         self.raw.clone()
     }
 
-    pub fn eval(&self) -> Option<Eval> {
+    pub fn eval(&self) -> Eval {
         self.eval.clone()
+    }
+
+    pub fn add_dep(&mut self, dep: CellRef) {
+        self.deps.insert(dep);
+    }
+
+    pub fn clear_deps(&mut self) {
+        self.deps.clear();
+    }
+
+    pub fn set_eval(&mut self, eval: Eval) {
+        self.eval = eval;
     }
 }
 

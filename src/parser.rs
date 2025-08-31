@@ -1,5 +1,5 @@
 use crate::{cell::CellRef, tokenizer::*};
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PrefixOp {
@@ -154,19 +154,24 @@ impl Expr {
     }
 }
 
-pub fn parse(input: &str) -> Result<Expr, String> {
+pub fn parse(input: &str) -> Result<(Expr, HashSet<CellRef>), String> {
     let mut tokenizer = Tokenizer::new(input)?;
     // println!("{:?}", tokenizer.tokens);
-    _parse(&mut tokenizer, 0)
+    let mut deps = HashSet::new();
+    Ok((_parse(&mut tokenizer, 0, &mut deps)?, deps))
 }
 
-pub fn _parse(input: &mut Tokenizer, min_prec: u8) -> Result<Expr, String> {
+pub fn _parse(
+    input: &mut Tokenizer,
+    min_prec: u8,
+    deps: &mut HashSet<CellRef>,
+) -> Result<Expr, String> {
     let mut lhs = match input.next() {
         Token::Literal(it) => Expr::Literal(it),
         Token::Identifier(id) if id == "true" => Expr::Literal(Literal::Boolean(true)),
         Token::Identifier(id) if id == "false" => Expr::Literal(Literal::Boolean(false)),
         Token::Paren('(') => {
-            let lhs = _parse(input, 0)?;
+            let lhs = _parse(input, 0, deps)?;
             if input.next() != Token::Paren(')') {
                 return Err(format!("Parse error: expected closing paren."));
             }
@@ -180,7 +185,7 @@ pub fn _parse(input: &mut Tokenizer, min_prec: u8) -> Result<Expr, String> {
                 it => return Err(format!("Parse error: unknown prefix operator {:?}.", it)),
             };
 
-            let rhs = _parse(input, prefix_op.prec().1)?;
+            let rhs = _parse(input, prefix_op.prec().1, deps)?;
 
             Expr::Prefix {
                 op: prefix_op,
@@ -209,7 +214,7 @@ pub fn _parse(input: &mut Tokenizer, min_prec: u8) -> Result<Expr, String> {
                         input.next(); // Skip comma
                     }
 
-                    let arg = _parse(input, 0)?;
+                    let arg = _parse(input, 0, deps)?;
                     args.push(arg);
                 }
 
@@ -218,7 +223,11 @@ pub fn _parse(input: &mut Tokenizer, min_prec: u8) -> Result<Expr, String> {
                     args: args,
                 }
             }
-            _ => Expr::CellRef(CellRef::new(id)?),
+            _ => {
+                let cell_ref = CellRef::new(id)?;
+                deps.insert(cell_ref);
+                Expr::CellRef(cell_ref)
+            }
         },
 
         it => return Err(format!("Parse error: did not expect token {:?}.", it)),
@@ -246,7 +255,7 @@ pub fn _parse(input: &mut Tokenizer, min_prec: u8) -> Result<Expr, String> {
             }
 
             input.next();
-            let rhs = _parse(input, r_prec)?;
+            let rhs = _parse(input, r_prec, deps)?;
             lhs = Expr::Infix {
                 op: infix_op,
                 lhs: Box::new(lhs),
