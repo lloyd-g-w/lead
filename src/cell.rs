@@ -6,7 +6,8 @@ use crate::evaluator::*;
 pub struct Cell {
     eval: Eval,
     raw: String,
-    deps: HashSet<CellRef>,
+    i_dep: HashSet<CellRef>,
+    they_dep: HashSet<CellRef>,
 }
 
 impl Cell {
@@ -14,7 +15,8 @@ impl Cell {
         Self {
             eval,
             raw,
-            deps: HashSet::new(),
+            i_dep: HashSet::new(),
+            they_dep: HashSet::new(),
         }
     }
 
@@ -26,12 +28,20 @@ impl Cell {
         self.eval.clone()
     }
 
-    pub fn add_dep(&mut self, dep: CellRef) {
-        self.deps.insert(dep);
+    pub fn add_i_dep(&mut self, dep: CellRef) {
+        self.i_dep.insert(dep);
     }
 
-    pub fn clear_deps(&mut self) {
-        self.deps.clear();
+    pub fn add_they_dep(&mut self, dep: CellRef) {
+        self.they_dep.insert(dep);
+    }
+
+    pub fn clear_i_dep(&mut self) {
+        self.i_dep.clear();
+    }
+
+    pub fn clear_they_dep(&mut self) {
+        self.they_dep.clear();
     }
 
     pub fn set_eval(&mut self, eval: Eval) {

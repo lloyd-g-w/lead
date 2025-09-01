@@ -5,6 +5,10 @@ mod tokenizer;
 
 use std::io;
 
+use std::{io, net::SocketAddr};
+use tokio::{net::TcpListener, runtime::Runtime};
+use websocket::server::WsServer;
+
 use crate::{cell::CellRef, evaluator::Evaluator};
 
 fn main() {
@@ -50,7 +54,7 @@ fn main() {
                     Err(e) => println!("{}", e),
                 },
                 _ => {
-                    continue; // Impossible
+                    panic!("Impossible.");
                 }
             }
         } else {
@@ -58,4 +62,10 @@ fn main() {
             continue;
         }
     }
+
+    let rt = Runtime::new().unwrap();
+    let handle = rt.handle().clone();
+    let addr = "127.0.0.1:7050";
+
+    let socket = WsServer::bind(addr, handle);
 }

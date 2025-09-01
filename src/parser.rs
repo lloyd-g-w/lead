@@ -91,6 +91,7 @@ impl fmt::Display for Expr {
     }
 }
 
+#[allow(dead_code)]
 impl Expr {
     pub fn pretty(&self) -> String {
         // entry point for users — root printed without └──
@@ -284,6 +285,7 @@ pub fn _parse(
             };
         }
     }
+
 
     Ok(lhs)
 }
