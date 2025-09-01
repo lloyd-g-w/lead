@@ -62,7 +62,7 @@ fn main() {
     }
 
     // let rt = Runtime::new().unwrap();
-    // let handle = rt.handle().clone();
+    let handle = rt.handle().clone();
     // let addr = "127.0.0.1:7050";
     //
     // let socket = WsServer::bind(addr, handle);

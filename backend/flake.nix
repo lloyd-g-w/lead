@@ -23,13 +23,22 @@
       nativeBuildInputs = nativeBuildInputs;
     };
 
-    # devShells.${system}.default = pkgs.mkShell {
-    #   packages = buildInputs;
-    #   inputsFrom = nativeBuildInputs;
-    #
-    #   shellHook = ''
-    #     exec zsh
-    #   '';
-    # };
+    devShells.${system}.default = pkgs.mkShell {
+      inputsFrom = [self.packages.${system}.default];
+
+      packages = with pkgs; [
+        rustc
+        cargo
+        rustfmt
+        rust-analyzer
+        zsh
+      ];
+
+      shellHook = ''
+        export SHELL=${pkgs.zsh}/bin/zsh
+        # jump into zsh if we didn't already start in it
+        [ -z "$ZSH_VERSION" ] && exec ${pkgs.zsh}/bin/zsh -l
+      '';
+    };
   };
 }
