@@ -8,9 +8,16 @@
   outputs = {
     self,
     nixpkgs,
-  }: {
-    packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
+  }: let
+    system = "x86_64-linux";
+    pkgs = import nixpkgs {inherit system;};
+  in {
+    devShells.default = pkgs.mkShell {
+      buildInputs = with pkgs; [
+        openssl
+      ];
 
-    packages.x86_64-linux.default = self.packages.x86_64-linux.hello;
+      nativeBuildInputs = [pkgs.pkg-config];
+    };
   };
 }
