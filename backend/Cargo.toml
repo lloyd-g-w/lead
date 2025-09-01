@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-websocket = "0.27.1"
+futures-util = "0.3.31"
+log = "0.4.27"
+tokio = { version = "1.47.1", features = ["rt-multi-thread", "macros", "net", "time"] }
+tokio-tungstenite = "0.27.0"
