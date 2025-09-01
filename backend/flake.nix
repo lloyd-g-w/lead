@@ -14,11 +14,22 @@
     system = "x86_64-linux";
     pkgs = import nixpkgs {inherit system;};
     naerskLib = pkgs.callPackage naersk {};
+    buildInputs = [pkgs.openssl];
+    nativeBuildInputs = [pkgs.pkg-config];
   in {
     packages.${system}.default = naerskLib.buildPackage {
       src = ./.;
-      buildInputs = [pkgs.openssl];
-      nativeBuildInputs = [pkgs.pkg-config];
+      buildInputs = buildInputs;
+      nativeBuildInputs = nativeBuildInputs;
     };
+
+    # devShells.${system}.default = pkgs.mkShell {
+    #   packages = buildInputs;
+    #   inputsFrom = nativeBuildInputs;
+    #
+    #   shellHook = ''
+    #     exec zsh
+    #   '';
+    # };
   };
 }
