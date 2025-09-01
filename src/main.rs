@@ -5,8 +5,6 @@ mod tokenizer;
 
 use std::io;
 
-use std::{io, net::SocketAddr};
-use tokio::{net::TcpListener, runtime::Runtime};
 use websocket::server::WsServer;
 
 use crate::{cell::CellRef, evaluator::Evaluator};
