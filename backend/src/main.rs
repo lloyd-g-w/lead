@@ -3,7 +3,7 @@ mod evaluator;
 mod parser;
 mod tokenizer;
 
-use futures_util::{StreamExt, TryStreamExt, future};
+use futures_util::{SinkExt, StreamExt, TryStreamExt, future};
 use log::info;
 use std::{env, io::Error};
 use tokio::net::{TcpListener, TcpStream};
@@ -12,6 +12,7 @@ use crate::{cell::CellRef, evaluator::Evaluator};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    env_logger::init();
     // let mut input = String::new();
     // io::stdin().read_line(&mut input).expect("Expected input.");
 
@@ -91,11 +92,20 @@ async fn accept_connection(stream: TcpStream) {
 
     info!("New WebSocket connection: {}", addr);
 
-    let (write, read) = ws_stream.split();
+    let (mut write, mut read) = ws_stream.split();
 
     // We should not forward messages other than text or binary.
-    read.try_filter(|msg| future::ready(msg.is_text() || msg.is_binary()))
-        .forward(write)
-        .await
-        .expect("Failed to forward messages");
+    while let Some(msg) = read.try_next().await.unwrap_or(None) {
+        if msg.is_text() || msg.is_binary() {
+            if let Err(e) = write
+                .send(format!("This is a message {}!", msg.to_text().unwrap_or("")).into())
+                .await
+            {
+                eprintln!("send error: {}", e);
+                break;
+            }
+        }
+    }
+
+    info!("Disconnected from {}", addr);
 }
