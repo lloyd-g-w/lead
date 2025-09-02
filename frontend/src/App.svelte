@@ -1,6 +1,18 @@
 <script lang="ts">
-  import { Input } from "$lib/components/ui/input";
   import { onMount } from "svelte";
+
+  const socket = new WebSocket("ws://localhost:7050");
+
+  socket.onmessage = (event) => {
+    const message = event.data;
+    console.log("Received message from server:", message);
+  };
+
+  socket.onopen = () => {
+    console.log("WebSocket connection established.");
+  };
+
+  // Connection opened
 
   // --- Configuration ---
   const numRows = 1000; // Increased to show performance
@@ -52,6 +64,23 @@
     }
   }
 
+  function handleCellBlur(row: number, col: number) {
+    // This function runs when a cell loses focus.
+    // You can add your logic here, e.g., validation, calculations, etc.
+    console.log(
+      `Cell (${row + 1}, ${columnLabels[col]}) lost focus. Value:`,
+      gridData[row][col],
+    );
+
+    socket.send(
+      JSON.stringify({
+        row: row + 1,
+        col: columnLabels[col],
+        value: gridData[row][col],
+      }),
+    );
+  }
+
   // --- Reactive Calculations for Virtualization ---
   // $: is a Svelte feature that re-runs code when its dependencies change.
 
@@ -89,7 +118,7 @@
         --col-header-height: {colHeaderHeight}px;
     "
   >
-    <!-- The scrollable viewport -->
+    <!-- The scrollable viewport provides the scrollbars -->
     <div
       class="viewport"
       bind:this={viewportElement}
@@ -100,89 +129,87 @@
         scrollLeft = e.currentTarget.scrollLeft;
       }}
     >
-      <!-- Sizer div: creates the full scrollable area -->
+      <!-- Sizer div creates the full scrollable area -->
       <div
         class="total-sizer"
         style:width="{numCols * colWidth}px"
         style:height="{numRows * rowHeight}px"
       />
+    </div>
 
-      {#if gridData}
-        <!-- Render Window: contains only the visible cells -->
+    <!-- The Renderer sits on top of the viewport and handles drawing -->
+    {#if gridData}
+      <div class="renderer">
+        <!-- Top-left corner -->
         <div
-          class="render-window"
-          style:transform="translate({scrollLeft}px, {scrollTop}px)"
-        >
-          <!-- Top-left corner -->
-          <div
-            class="top-left-corner"
-            class:active-header-corner={activeCell !== null}
-          />
+          class="top-left-corner"
+          class:active-header-corner={activeCell !== null}
+        />
 
-          <!-- Visible Column Headers -->
-          <div
-            class="col-headers-container"
-            style:transform="translateX(-{scrollLeft % colWidth}px)"
-          >
+        <!-- Visible Column Headers -->
+        <div
+          class="col-headers-container"
+          style:transform="translateX(-{scrollLeft}px)"
+        >
+          {#each visibleCols as j (j)}
+            <div
+              class="header-cell"
+              style:left="{j * colWidth}px"
+              class:active-header={activeCell !== null && activeCell[1] === j}
+            >
+              {columnLabels[j]}
+            </div>
+          {/each}
+        </div>
+
+        <!-- Visible Row Headers -->
+        <div
+          class="row-headers-container"
+          style:transform="translateY(-{scrollTop}px)"
+        >
+          {#each visibleRows as i (i)}
+            <div
+              class="row-number-cell"
+              style:top="{i * rowHeight}px"
+              class:active-header={activeCell !== null && activeCell[0] === i}
+            >
+              {i + 1}
+            </div>
+          {/each}
+        </div>
+
+        <!-- Visible Grid Cells -->
+        <div
+          class="cells-container"
+          style:transform="translate(-{scrollLeft}px, -{scrollTop}px)"
+        >
+          {#each visibleRows as i (i)}
             {#each visibleCols as j (j)}
               <div
-                class="header-cell"
-                style:left="{j * colWidth}px"
-                class:active-header={activeCell !== null && activeCell[1] === j}
-              >
-                {columnLabels[j]}
-              </div>
-            {/each}
-          </div>
-
-          <!-- Visible Row Headers -->
-          <div
-            class="row-headers-container"
-            style:transform="translateY(-{scrollTop % rowHeight}px)"
-          >
-            {#each visibleRows as i (i)}
-              <div
-                class="row-number-cell"
+                class="grid-cell"
                 style:top="{i * rowHeight}px"
-                class:active-header={activeCell !== null && activeCell[0] === i}
+                style:left="{j * colWidth}px"
               >
-                {i + 1}
+                <!-- Using a standard input to ensure styles are applied correctly -->
+                <input
+                  type="text"
+                  bind:value={gridData[i][j]}
+                  class="cell-input"
+                  on:focus={() => (activeCell = [i, j])}
+                  on:blur={() => handleCellBlur(i, j)}
+                />
+                <!-- Active cell indicator with fill handle -->
+                {#if activeCell && activeCell[0] === i && activeCell[1] === j}
+                  <div class="active-cell-indicator">
+                    <div class="fill-handle" />
+                  </div>
+                {/if}
               </div>
             {/each}
-          </div>
-
-          <!-- Visible Grid Cells -->
-          <div
-            class="cells-container"
-            style:transform="translate(-{scrollLeft % colWidth}px, -{scrollTop %
-              rowHeight}px)"
-          >
-            {#each visibleRows as i (i)}
-              {#each visibleCols as j (j)}
-                <div
-                  class="grid-cell"
-                  style:top="{i * rowHeight}px"
-                  style:left="{j * colWidth}px"
-                >
-                  <Input
-                    type="text"
-                    bind:value={gridData[i][j]}
-                    class="cell-input"
-                    on:focus={() => (activeCell = [i, j])}
-                  />
-                  <!-- Active cell indicator with fill handle -->
-                  {#if activeCell && activeCell[0] === i && activeCell[1] === j}
-                    <div class="active-cell-indicator">
-                      <div class="fill-handle" />
-                    </div>
-                  {/if}
-                </div>
-              {/each}
-            {/each}
-          </div>
+          {/each}
         </div>
-      {/if}
-    </div>
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -199,20 +226,23 @@
     width: 100%;
     height: 100%;
     overflow: auto;
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
   }
   .total-sizer {
     position: relative;
     pointer-events: none;
   }
-  .render-window {
+
+  .renderer {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
     overflow: hidden;
-    pointer-events: none; /* Pass clicks through to elements below */
   }
 
   .top-left-corner,
@@ -291,42 +321,51 @@
     border-right: 1px solid hsl(var(--border) / 0.7);
     border-bottom: 1px solid hsl(var(--border) / 0.7);
     pointer-events: auto;
+    background-color: hsl(var(--background));
   }
 
   .cell-input {
+    /* Overriding all default input styles */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     width: 100%;
     height: 100%;
     padding: 0 0.5rem;
+    margin: 0;
     background-color: transparent;
-    border: none;
     border-radius: 0;
+    border: 1px solid black;
     font-size: 0.875rem;
+    font-family: inherit;
     text-align: left;
     outline: none;
     box-shadow: none;
   }
-  .cell-input:focus {
-    box-shadow: none; /* Removes shadcn default focus ring */
+  /* Ensure no focus styles are added by the browser or libraries */
+  .cell-input:focus,
+  .cell-input:focus-visible {
+    border: 1px solid red;
   }
 
   .active-cell-indicator {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: -1px;
+    left: -1px;
+    width: calc(100% + 2px);
+    height: calc(100% + 2px);
     border: 2px solid hsl(var(--primary));
     pointer-events: none;
     z-index: 5;
   }
   .fill-handle {
     position: absolute;
-    bottom: -3px;
-    right: -3px;
-    width: 5px;
-    height: 5px;
+    bottom: -4px;
+    right: -4px;
+    width: 6px;
+    height: 6px;
     background: hsl(var(--primary));
+    border: 1px solid hsl(var(--primary-foreground));
     cursor: crosshair;
   }
-
 </style>
