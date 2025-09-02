@@ -1,4 +1,4 @@
-# lead (Pb)
+# lead
 
 ## Running and building the project
 
