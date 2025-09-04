@@ -1,7 +1,7 @@
 use crate::cell::{Cell, CellRef};
 use crate::parser::*;
 use crate::tokenizer::Literal;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -34,15 +34,17 @@ impl Evaluator {
         }
 
         let eval: Eval;
+        let deps: HashSet<CellRef>;
 
         if let Some(c) = raw_val.chars().nth(0)
             && c == '='
         {
-            eval = self.evaluate(raw_val[1..].to_owned())?;
+            (eval, deps) = self.evaluate(raw_val[1..].to_owned())?;
+            // for dep in deps {}
         } else {
             match self.evaluate(raw_val.to_owned()) {
                 Ok(e) => {
-                    eval = e;
+                    (eval, deps) = e;
                 }
                 Err(_) => eval = Eval::Literal(Literal::String(raw_val.to_owned())),
             }
@@ -61,14 +63,28 @@ impl Evaluator {
 
         Ok((cell.raw(), cell.eval()))
     }
+    pub fn add_cell_dep(&mut self, cell_ref: CellRef, dep_ref: CellRef) -> Result<(), String> {
+        if !self.cells.contains_key(&cell_ref) {
+            return Err(format!("Cell at {:?} not found.", cell_ref));
+        }
 
-    pub fn evaluate(&mut self, str: String) -> Result<Eval, String> {
-        let (mut expr, mut deps) = parse(&str)?;
+        if let Some(cell) = self.cells.get_mut(&cell_ref) {
+            cell.add_i_dep(dep_ref);
+        }
 
-        self.evaluate_expr(&mut expr)
+        Ok(())
     }
 
-    fn evaluate_expr(&mut self, expr: &mut Expr) -> Result<Eval, String> {
+    pub fn evaluate(&mut self, str: String) -> Result<(Eval, HashSet<CellRef>), String> {
+        let (expr, deps) = parse(&str)?;
+
+        match self.evaluate_expr(&expr) {
+            Ok(it) => Ok((it, deps)),
+            Err(it) => Err(it),
+        }
+    }
+
+    fn evaluate_expr(&mut self, expr: &Expr) -> Result<Eval, String> {
         let res = match expr {
             Expr::Literal(lit) => Eval::Literal(lit.clone()),
             Expr::CellRef(re) => self.get_cell(re.to_owned())?.1,
