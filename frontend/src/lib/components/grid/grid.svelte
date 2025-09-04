@@ -3,34 +3,20 @@
 	import Cell from '$lib/components/grid/cell.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
-	import { fromGridRef, toColLetter, toGridRef, type CellData, type CellValue } from './utils';
+	import {
+		fromGridRef,
+		splitErrorString,
+		toColLetter,
+		toGridRef,
+		type CellData,
+		type CellValue
+	} from './utils';
 
 	let {
 		socket
 	}: {
 		socket: WebSocket;
 	} = $props();
-
-	function splitErrorString(errorString: string) {
-		// Remove the "ERR " prefix.
-		const content = errorString.substring(4);
-
-		// Find the index of the first colon.
-		const colonIndex = content.indexOf(':');
-
-		// If no colon is found, return the whole content as the first element.
-		if (colonIndex === -1) {
-			return [content.trim(), ''];
-		}
-
-		// Extract the part before the colon (the error type).
-		const errorType = content.substring(0, colonIndex).trim();
-
-		// Extract the part after the colon (the error message).
-		const errorMessage = content.substring(colonIndex + 1).trim();
-
-		return [errorType, errorMessage];
-	}
 
 	socket.onmessage = (msg: MessageEvent) => {
 		const input = msg.data.toString().trim();
@@ -87,8 +73,8 @@
 		}
 	};
 
-	let rows = 50;
-	let cols = 50;
+	let rows = 100;
+	let cols = 60;
 
 	let default_row_height = '30px';
 	let default_col_width = '60px';

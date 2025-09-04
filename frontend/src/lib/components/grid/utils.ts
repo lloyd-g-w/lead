@@ -1,3 +1,10 @@
+export type CellValue = number | string | undefined;
+
+export interface CellData {
+	raw_val: string;
+	val: CellValue;
+}
+
 export function fromGridRef(ref: string): [number, number] {
 	const match = ref.match(/^([A-Z]+)([0-9]+)$/i);
 	if (!match) throw new Error('Invalid reference');
@@ -31,9 +38,23 @@ export function toGridRef(row: number, col: number): string {
 	return toColLetter(col) + row.toString();
 }
 
-export type CellValue = number | string | undefined;
+export function splitErrorString(errorString: string) {
+	// Remove the "ERR " prefix.
+	const content = errorString.substring(4);
 
-export interface CellData {
-	raw_val: string;
-	val: CellValue;
+	// Find the index of the first colon.
+	const colonIndex = content.indexOf(':');
+
+	// If no colon is found, return the whole content as the first element.
+	if (colonIndex === -1) {
+		return [content.trim(), ''];
+	}
+
+	// Extract the part before the colon (the error type).
+	const errorType = content.substring(0, colonIndex).trim();
+
+	// Extract the part after the colon (the error message).
+	const errorMessage = content.substring(colonIndex + 1).trim();
+
+	return [errorType, errorMessage];
 }
