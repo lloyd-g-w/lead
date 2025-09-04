@@ -28,9 +28,9 @@ impl Evaluator {
         };
     }
 
-    pub fn set_cell(&mut self, cell_ref: CellRef, raw_val: String) -> Result<(), String> {
+    pub fn set_cell(&mut self, cell_ref: CellRef, raw_val: String) -> Result<Eval, String> {
         if self.cells.contains_key(&cell_ref) && self.cells[&cell_ref].raw() == raw_val {
-            return Ok(());
+            return self.get_cell(cell_ref);
         }
 
         let eval: Eval;
@@ -50,19 +50,23 @@ impl Evaluator {
             }
         }
 
-        self.cells.insert(cell_ref, Cell::new(eval, raw_val));
-        Ok(())
+        self.cells
+            .insert(cell_ref, Cell::new(eval.clone(), raw_val));
+        Ok(eval)
     }
 
-    pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<(String, Eval), String> {
+    // pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<(String, Eval), String> {
+    pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<Eval, String> {
         if !self.cells.contains_key(&cell_ref) {
             return Err(format!("Cell at {:?} not found.", cell_ref));
         }
 
         let cell = &self.cells[&cell_ref];
 
-        Ok((cell.raw(), cell.eval()))
+        // Ok((cell.raw(), cell.eval()))
+        Ok(cell.eval())
     }
+
     pub fn add_cell_dep(&mut self, cell_ref: CellRef, dep_ref: CellRef) -> Result<(), String> {
         if !self.cells.contains_key(&cell_ref) {
             return Err(format!("Cell at {:?} not found.", cell_ref));
@@ -87,7 +91,7 @@ impl Evaluator {
     fn evaluate_expr(&mut self, expr: &Expr) -> Result<Eval, String> {
         let res = match expr {
             Expr::Literal(lit) => Eval::Literal(lit.clone()),
-            Expr::CellRef(re) => self.get_cell(re.to_owned())?.1,
+            Expr::CellRef(re) => self.get_cell(re.to_owned())?,
             Expr::Infix { op, lhs, rhs } => {
                 let lval = self.evaluate_expr(lhs)?;
                 let rval = self.evaluate_expr(rhs)?;
@@ -151,6 +155,14 @@ fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
+            if let (Literal::Integer(_), Literal::Integer(y)) = (a, b) {
+                if *y == 0 {
+                    return Err(
+                        "Evaluation error: integers attempted to divide by zero.".to_string()
+                    );
+                }
+            }
+
             if let Some(res) = eval_numeric_infix(a, b, |x, y| x / y, |x, y| x / y) {
                 return Ok(Eval::Literal(res));
             }
