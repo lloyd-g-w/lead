@@ -104,6 +104,17 @@ impl Evaluator {
                     _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
                 }
             }
+            Expr::Prefix { op, expr } => {
+                let val = self.evaluate_expr(expr)?;
+
+                match op {
+                    PrefixOp::POS => eval_pos(&val)?,
+                    PrefixOp::NEG => eval_neg(&val)?,
+                    PrefixOp::NOT => eval_not(&val)?,
+                    _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
+                }
+            }
+            Expr::Group(g) => self.evaluate_expr(g)?,
             it => return Err(format!("Evaluation error: Unsupported expression {:?}", it)),
         };
 
@@ -192,5 +203,27 @@ where
             Some(Literal::Double(double_op(*a, *b as f64)))
         }
         _ => None,
+    }
+}
+
+fn eval_pos(val: &Eval) -> Result<Eval, String> {
+    match val {
+        Eval::Literal(Literal::Integer(it)) => Ok(Eval::Literal(Literal::Integer(*it))),
+        Eval::Literal(Literal::Double(it)) => Ok(Eval::Literal(Literal::Double(*it))),
+        _ => Err("Evaluation error: expected numeric type for POS function.".to_string()),
+    }
+}
+
+fn eval_neg(val: &Eval) -> Result<Eval, String> {
+    match val {
+        Eval::Literal(Literal::Integer(it)) => Ok(Eval::Literal(Literal::Integer(-it))),
+        Eval::Literal(Literal::Double(it)) => Ok(Eval::Literal(Literal::Double(-it))),
+        _ => Err("Evaluation error: expected numeric type for NEG function.".to_string()),
+    }
+}
+fn eval_not(val: &Eval) -> Result<Eval, String> {
+    match val {
+        Eval::Literal(Literal::Boolean(it)) => Ok(Eval::Literal(Literal::Boolean(!it))),
+        _ => Err("Evaluation error: expected boolean type for NEG function.".to_string()),
     }
 }
