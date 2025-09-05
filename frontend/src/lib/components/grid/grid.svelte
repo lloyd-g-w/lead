@@ -202,9 +202,18 @@
 	});
 </script>
 
-<div class="grid-wrapper">
-	<div class="flex w-fit">
-		<CellHeader height={default_row_height} width={default_col_width} val="" active={false} />
+<div class="grid-wrapper relative max-h-[100vh] max-w-full overflow-auto">
+	<div class="sticky top-0 z-40 flex w-fit">
+		<div class="sticky top-0 left-0 z-50">
+			<CellHeader
+				resizeable={false}
+				height={default_row_height}
+				width={default_col_width}
+				val=""
+				active={false}
+			/>
+		</div>
+
 		{#each Array(cols) as _, j}
 			<CellHeader
 				height={default_row_height}
@@ -218,14 +227,16 @@
 	</div>
 	{#each Array(rows) as _, i}
 		<div class="flex w-fit">
-			<CellHeader
-				direction="row"
-				width={default_col_width}
-				height={getRowHeight(i)}
-				setRowHeight={(height) => setRowHeight(i, height)}
-				val={(i + 1).toString()}
-				active={active_cell !== null && active_cell[0] === i}
-			/>
+			<div class="sticky left-0 z-30 flex w-fit">
+				<CellHeader
+					direction="row"
+					width={default_col_width}
+					height={getRowHeight(i)}
+					setRowHeight={(height) => setRowHeight(i, height)}
+					val={(i + 1).toString()}
+					active={active_cell !== null && active_cell[0] === i}
+				/>
+			</div>
 			{#each Array(cols) as _, j}
 				<Cell
 					height={getRowHeight(i)}

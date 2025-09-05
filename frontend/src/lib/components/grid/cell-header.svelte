@@ -8,7 +8,8 @@
 		setRowHeight = () => {},
 		val,
 		active,
-		direction = 'col' // New prop: 'col' for right-side drag, 'row' for bottom-side
+		direction = 'col', // New prop: 'col' for right-side drag, 'row' for bottom-side
+		resizeable = true
 	}: {
 		width?: string;
 		height?: string;
@@ -16,6 +17,7 @@
 		setRowHeight?: (height: string) => void;
 		val: string;
 		active: boolean;
+		resizeable?: boolean;
 		direction?: 'col' | 'row';
 	} = $props();
 
@@ -66,27 +68,29 @@
 		{val}
 	</span>
 
-	<div
-		role="separator"
-		aria-label="Resize handle"
-		onmousedown={handleMouseDown}
-		class={clsx('resizer', {
-			'resizer-col': direction === 'col',
-			'resizer-row': direction === 'row'
-		})}
-	></div>
+	{#if resizeable}
+		<div
+			role="separator"
+			aria-label="Resize handle"
+			onmousedown={handleMouseDown}
+			class={clsx('resizer', {
+				'resizer-col': direction === 'col',
+				'resizer-row': direction === 'row'
+			})}
+		></div>
+	{/if}
 </div>
 
 <style>
 	.placeholder {
 		font-size: 14px;
 		border: 1px solid var(--input);
-		overflow: visible;
+		background-color: var(--color-background);
 	}
 
 	.active {
 		border: 1px solid var(--color-primary);
-		background-color: color-mix(in oklab, var(--color-primary) 40%, transparent);
+		background-color: color-mix(in oklab, var(--color-primary) 80%, var(--color-background) 80%);
 	}
 
 	/* --- Resizer Styles --- */

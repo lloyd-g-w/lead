@@ -36,10 +36,13 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.key == 'Escape') {
+		if (e.key === 'Enter' || e.key === 'NumpadEnter') {
 			e.preventDefault(); // avoid form submit/line break
 			const el = (e.currentTarget as HTMLElement).querySelector('input') as HTMLInputElement | null;
 			el?.blur(); // triggers on:blur below
+		} else if (e.key == 'Escape') {
+			e.preventDefault();
+			stopediting();
 		}
 	}
 </script>
@@ -50,7 +53,7 @@
 			style="width: {width}; height: {height}"
 			class="relative rounded-none p-1
              !transition-none delay-0 duration-0
-             focus:z-50"
+             focus:z-20"
 			onblur={(e) => {
 				raw_val = (e.target as HTMLInputElement).value;
 				stopediting();
@@ -63,7 +66,7 @@
 		{onmousedown}
 		style:width
 		style:height
-		class={clsx('placeholder bg-background p-1 dark:bg-input/30', { active, 'z-50': active })}
+		class={clsx('placeholder bg-background p-1 dark:bg-input/30', { active, 'z-20': active })}
 	>
 		{#if raw_val !== '' || val !== ''}
 			<span class="pointer-events-none select-none">
