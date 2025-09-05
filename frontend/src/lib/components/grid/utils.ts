@@ -5,7 +5,16 @@ export interface CellData {
 	val: CellValue;
 }
 
-export function fromGridRef(ref: string): [number, number] {
+export interface CellRef {
+	row: number;
+	col: number;
+	str: string;
+}
+
+/**
+ * Zero indexed | A1 == {row: 0, col: 0};
+ */
+export function refFromStr(ref: string): CellRef {
 	const match = ref.match(/^([A-Z]+)([0-9]+)$/i);
 	if (!match) throw new Error('Invalid reference');
 
@@ -17,25 +26,29 @@ export function fromGridRef(ref: string): [number, number] {
 	}
 
 	const row = parseInt(rowStr, 10);
-	return [row - 1, col - 1];
+	return { row: row - 1, col: col - 1, str: ref };
 }
 
-export function toColLetter(col: number): string {
+/**
+ * Zero indexed | 0 == A;
+ */
+export function colToStr(col: number): string {
 	let result = '';
 	let n = col;
-	while (n > 0) {
-		const rem = (n - 1) % 26;
+	while (n >= 0) {
+		const rem = n % 26;
 		result = String.fromCharCode(65 + rem) + result; // 65 = 'A'
-		n = Math.floor((n - 1) / 26);
+		n = Math.floor(n / 26) - 1;
 	}
 
 	return result;
 }
 
-export function toGridRef(row: number, col: number): string {
-	row++;
-	col++;
-	return toColLetter(col) + row.toString();
+/**
+ * Zero indexed | A1 == {row: 0, col: 0};
+ */
+export function refFromPos(row: number, col: number): CellRef {
+	return { row, col, str: colToStr(col) + (row + 1).toString() };
 }
 
 export function splitErrorString(errorString: string) {

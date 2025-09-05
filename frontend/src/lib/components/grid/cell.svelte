@@ -80,7 +80,9 @@
 <style>
 	.placeholder {
 		border: 1px solid var(--input);
+		white-space: nowrap;
 		overflow: hidden;
+		text-overflow: clip;
 	}
 
 	.active {

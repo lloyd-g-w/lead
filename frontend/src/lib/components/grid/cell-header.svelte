@@ -74,14 +74,14 @@
 			'resizer-col': direction === 'col',
 			'resizer-row': direction === 'row'
 		})}
-	/>
+	></div>
 </div>
 
 <style>
 	.placeholder {
 		font-size: 14px;
 		border: 1px solid var(--input);
-		overflow: hidden;
+		overflow: visible;
 	}
 
 	.active {
@@ -95,31 +95,32 @@
 		/* Make it easier to grab */
 		z-index: 10;
 		/* Subtle visual cue, becomes more visible on hover */
-		background-color: transparent;
-		transition: background-color 0.2s ease-in-out;
+		background-color: var(--color-primary);
+		opacity: 0;
+		transition: opacity 0.1s ease-in-out;
 	}
 
 	/* Style for vertical (column) resizing */
 	.resizer-col {
 		cursor: col-resize;
 		top: 0;
-		right: 0;
-		width: 8px; /* Larger grab area */
+		right: -5px;
+		width: 9px; /* Larger grab area */
 		height: 100%;
 	}
 
 	/* Style for horizontal (row) resizing */
 	.resizer-row {
 		cursor: row-resize;
-		bottom: 0;
+		bottom: -5px;
 		left: 0;
-		height: 8px; /* Larger grab area */
+		height: 9px; /* Larger grab area */
 		width: 100%;
 	}
 
 	/* Make the handle visible when hovering over the component */
+	.resizer:hover,
 	.group:hover > .resizer {
-		background-color: var(--color-primary);
 		opacity: 0.5;
 	}
 </style>

@@ -4,10 +4,10 @@
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
 	import {
-		fromGridRef,
+		refFromStr,
 		splitErrorString,
-		toColLetter,
-		toGridRef,
+		colToStr,
+		refFromPos,
 		type CellData,
 		type CellValue
 	} from './utils';
@@ -30,46 +30,46 @@
 			return;
 		}
 
-		let cellRef: string | undefined;
+		let strRef: string | undefined;
 		let evalStr: string | undefined;
 
 		// Case 1: "Cell D4 = Integer(4)"
 		let match = input.match(/^Cell\s+([A-Z]+\d+)\s*=\s*(.+)$/);
 		if (match) {
-			[, cellRef, evalStr] = match;
+			[, strRef, evalStr] = match;
 		}
 
 		// Case 2: "D6 String("hello")" or "E9 Double(4.0)"
 		if (!match) {
 			match = input.match(/^([A-Z]+\d+)\s+(.+)$/);
 			if (match) {
-				[, cellRef, evalStr] = match;
+				[, strRef, evalStr] = match;
 			}
 		}
 
-		if (!cellRef || !evalStr) {
+		if (!strRef || !evalStr) {
 			console.warn('Unrecognized message:', input);
 			return;
 		}
 
-		console.log(`Cell: ${cellRef}`);
+		console.log(`Cell: ${strRef}`);
 		console.log(`Eval: ${evalStr}`);
 
-		let [i, j] = fromGridRef(cellRef);
+		let { row, col } = refFromStr(strRef);
 
 		// Parse eval types
 		if (evalStr.startsWith('Integer(')) {
 			const num = parseInt(evalStr.match(/^Integer\(([-\d]+)\)$/)?.[1] ?? 'NaN', 10);
 			console.log(`Parsed integer:`, num);
-			setCellVal(i, j, num);
+			setCellVal(row, col, num);
 		} else if (evalStr.startsWith('Double(')) {
 			const num = parseFloat(evalStr.match(/^Double\(([-\d.]+)\)$/)?.[1] ?? 'NaN');
 			console.log(`Parsed double:`, num);
-			setCellVal(i, j, num);
+			setCellVal(row, col, num);
 		} else if (evalStr.startsWith('String(')) {
 			const str = evalStr.match(/^String\("(.+)"\)$/)?.[1];
 			console.log(`Parsed string:`, str);
-			setCellVal(i, j, str);
+			setCellVal(row, col, str);
 		}
 	};
 
@@ -77,7 +77,7 @@
 	let cols = 60;
 
 	let default_row_height = '30px';
-	let default_col_width = '60px';
+	let default_col_width = '80px';
 
 	// Only store touched cells
 	let grid_vals: Record<string, CellData> = $state({});
@@ -150,7 +150,7 @@
 		else {
 			setCellRaw(i, j, v);
 			console.log(i, j);
-			socket.send(`set ${toGridRef(i, j)} ${v}`);
+			socket.send(`set ${refFromPos(i, j).str} ${v}`);
 		}
 	};
 
@@ -170,7 +170,7 @@
 				e.preventDefault();
 
 				// --- This is the same reference-inserting logic as before ---
-				const ref = toGridRef(i, j);
+				const ref = refFromPos(i, j).str;
 				if (el) {
 					const { selectionStart, selectionEnd } = el;
 					const before = el.value.slice(0, selectionStart ?? 0);
@@ -211,7 +211,7 @@
 				width={getColWidth(j)}
 				setColWidth={(width) => setColWidth(j, width)}
 				direction="col"
-				val={toColLetter(j + 1)}
+				val={colToStr(j)}
 				active={active_cell !== null && active_cell[1] === j}
 			/>
 		{/each}
