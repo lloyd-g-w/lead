@@ -3,84 +3,57 @@
 	import Cell from '$lib/components/grid/cell.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
-	import {
-		refFromStr,
-		splitErrorString,
-		colToStr,
-		refFromPos,
-		type CellData,
-		type CellValue
-	} from './utils';
+	import { colToStr, refToStr, type CellT } from './utils';
+	import clsx from 'clsx';
 
 	let {
-		socket
+		socket,
+		class: className = ''
 	}: {
+		class?: string;
 		socket: WebSocket;
 	} = $props();
 
 	socket.onmessage = (msg: MessageEvent) => {
-		const input = msg.data.toString().trim();
+		let res: LeadMsg;
 
-		if (input.startsWith('ERR')) {
-			let split = splitErrorString(input);
-			toast.error(split[0], {
-				description: split[1]
-			});
-
+		try {
+			res = JSON.parse(msg.data);
+			console.log(res);
+		} catch (err) {
+			console.error('Failed to parse LeadMsg:', err);
 			return;
 		}
 
-		let strRef: string | undefined;
-		let evalStr: string | undefined;
-
-		// Case 1: "Cell D4 = Integer(4)"
-		let match = input.match(/^Cell\s+([A-Z]+\d+)\s*=\s*(.+)$/);
-		if (match) {
-			[, strRef, evalStr] = match;
-		}
-
-		// Case 2: "D6 String("hello")" or "E9 Double(4.0)"
-		if (!match) {
-			match = input.match(/^([A-Z]+\d+)\s+(.+)$/);
-			if (match) {
-				[, strRef, evalStr] = match;
+		switch (res.msg_type) {
+			case 'error': {
+				toast.error('Error', {
+					description: res.raw
+				});
+				break;
 			}
-		}
-
-		if (!strRef || !evalStr) {
-			console.warn('Unrecognized message:', input);
-			return;
-		}
-
-		console.log(`Cell: ${strRef}`);
-		console.log(`Eval: ${evalStr}`);
-
-		let { row, col } = refFromStr(strRef);
-
-		// Parse eval types
-		if (evalStr.startsWith('Integer(')) {
-			const num = parseInt(evalStr.match(/^Integer\(([-\d]+)\)$/)?.[1] ?? 'NaN', 10);
-			console.log(`Parsed integer:`, num);
-			setCellVal(row, col, num);
-		} else if (evalStr.startsWith('Double(')) {
-			const num = parseFloat(evalStr.match(/^Double\(([-\d.]+)\)$/)?.[1] ?? 'NaN');
-			console.log(`Parsed double:`, num);
-			setCellVal(row, col, num);
-		} else if (evalStr.startsWith('String(')) {
-			const str = evalStr.match(/^String\("(.+)"\)$/)?.[1];
-			console.log(`Parsed string:`, str);
-			setCellVal(row, col, str);
+			case 'set': {
+				if (res.cell === undefined) {
+					console.error('Expected cell ref for SET response from server.');
+					return;
+				} else if (res.eval === undefined) {
+					console.error('Expected cell value for SET response from server.');
+					return;
+				}
+				setCellVal(res.cell.row, res.cell.col, res.eval.value);
+				break;
+			}
 		}
 	};
 
-	let rows = 100;
-	let cols = 60;
+	let rows = 50;
+	let cols = 40;
 
 	let default_row_height = '30px';
 	let default_col_width = '80px';
 
 	// Only store touched cells
-	let grid_vals: Record<string, CellData> = $state({});
+	let grid_vals: Record<string, CellT> = $state({});
 	let row_heights: Record<number, string> = $state({});
 	let col_widths: Record<number, string> = $state({});
 
@@ -136,7 +109,7 @@
 		}
 	};
 	const getCellVal = (i: number, j: number) => getCell(i, j)?.val ?? undefined;
-	const setCellVal = (i: number, j: number, val: CellValue) => {
+	const setCellVal = (i: number, j: number, val: LiteralValue) => {
 		if (grid_vals[key(i, j)] === undefined) {
 			console.warn('Cell raw value was undefined but recieved eval.');
 		} else {
@@ -144,19 +117,21 @@
 		}
 	};
 
-	const setCell = (i: number, j: number, v: string | undefined) => {
+	const setCell = (row: number, col: number, v: string | undefined) => {
 		// ignore “no value” so we don’t create keys on mount
-		if (v == null || v === '') delete grid_vals[key(i, j)];
+		if (v == null || v === '') delete grid_vals[key(row, col)];
 		else {
-			setCellRaw(i, j, v);
-			console.log(i, j);
-			socket.send(`set ${refFromPos(i, j).str} ${v}`);
+			setCellRaw(row, col, v);
+
+			let msg: LeadMsg = {
+				msg_type: 'set',
+				cell: { row, col },
+				raw: v
+			};
+
+			socket.send(JSON.stringify(msg));
 		}
 	};
-
-	// $effect(() => {
-	// 	$inspect(grid_vals);
-	// });
 
 	function handleCellInteraction(i: number, j: number, e: MouseEvent) {
 		if (editing_cell) {
@@ -170,7 +145,7 @@
 				e.preventDefault();
 
 				// --- This is the same reference-inserting logic as before ---
-				const ref = refFromPos(i, j).str;
+				const ref = refToStr(i, j);
 				if (el) {
 					const { selectionStart, selectionEnd } = el;
 					const before = el.value.slice(0, selectionStart ?? 0);
@@ -202,15 +177,18 @@
 	});
 </script>
 
-<div class="grid-wrapper relative max-h-[100vh] max-w-full overflow-auto">
-	<div class="sticky top-0 z-40 flex w-fit">
-		<div class="sticky top-0 left-0 z-50">
+<div
+	class={clsx('grid-wrapper relative h-full min-h-0 max-w-full min-w-0 overflow-auto', className)}
+>
+	<div class="sticky top-0 flex w-fit" style="z-index: {rows + 70}">
+		<div class="sticky top-0 left-0" style="z-index: {rows + 70}">
 			<CellHeader
 				resizeable={false}
 				height={default_row_height}
 				width={default_col_width}
 				val=""
 				active={false}
+				direction="blank"
 			/>
 		</div>
 
@@ -226,8 +204,8 @@
 		{/each}
 	</div>
 	{#each Array(rows) as _, i}
-		<div class="flex w-fit">
-			<div class="sticky left-0 z-30 flex w-fit">
+		<div class="relative flex w-fit">
+			<div class="sticky left-0 flex w-fit" style="z-index: {rows - i + 40}">
 				<CellHeader
 					direction="row"
 					width={default_col_width}

@@ -1,7 +1,8 @@
-use crate::cell::{Cell, CellRef};
+use crate::cell::CellRef;
+use crate::grid::Grid;
 use crate::parser::*;
 use crate::tokenizer::Literal;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -17,115 +18,58 @@ impl fmt::Display for Eval {
     }
 }
 
-pub struct Evaluator {
-    cells: HashMap<CellRef, Cell>,
+pub fn evaluate(str: String, grid: Option<&Grid>) -> Result<(Eval, HashSet<CellRef>), String> {
+    let (expr, deps) = parse(&str)?;
+
+    match evaluate_expr(&expr, grid) {
+        Ok(it) => Ok((it, deps)),
+        Err(it) => Err(it),
+    }
 }
 
-impl Evaluator {
-    pub fn new() -> Evaluator {
-        return Evaluator {
-            cells: HashMap::new(),
-        };
-    }
-
-    pub fn set_cell(&mut self, cell_ref: CellRef, raw_val: String) -> Result<Eval, String> {
-        if self.cells.contains_key(&cell_ref) && self.cells[&cell_ref].raw() == raw_val {
-            return self.get_cell(cell_ref);
-        }
-
-        let eval: Eval;
-        let deps: HashSet<CellRef>;
-
-        if let Some(c) = raw_val.chars().nth(0)
-            && c == '='
-        {
-            (eval, deps) = self.evaluate(raw_val[1..].to_owned())?;
-            // for dep in deps {}
-        } else {
-            match self.evaluate(raw_val.to_owned()) {
-                Ok(e) => {
-                    (eval, deps) = e;
-                }
-                Err(_) => eval = Eval::Literal(Literal::String(raw_val.to_owned())),
+fn evaluate_expr(expr: &Expr, grid: Option<&Grid>) -> Result<Eval, String> {
+    let res = match expr {
+        Expr::Literal(lit) => Eval::Literal(lit.clone()),
+        Expr::CellRef(re) => {
+            if let Some(g) = grid {
+                g.get_cell(re.to_owned())?
+            } else {
+                return Err("Evaluation error: Found cell reference but no grid.".into());
             }
         }
+        Expr::Infix { op, lhs, rhs } => {
+            let lval = evaluate_expr(lhs, grid)?;
+            let rval = evaluate_expr(rhs, grid)?;
 
-        self.cells
-            .insert(cell_ref, Cell::new(eval.clone(), raw_val));
-        Ok(eval)
-    }
-
-    // pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<(String, Eval), String> {
-    pub fn get_cell(&mut self, cell_ref: CellRef) -> Result<Eval, String> {
-        if !self.cells.contains_key(&cell_ref) {
-            return Err(format!("Cell at {:?} not found.", cell_ref));
-        }
-
-        let cell = &self.cells[&cell_ref];
-
-        // Ok((cell.raw(), cell.eval()))
-        Ok(cell.eval())
-    }
-
-    pub fn add_cell_dep(&mut self, cell_ref: CellRef, dep_ref: CellRef) -> Result<(), String> {
-        if !self.cells.contains_key(&cell_ref) {
-            return Err(format!("Cell at {:?} not found.", cell_ref));
-        }
-
-        if let Some(cell) = self.cells.get_mut(&cell_ref) {
-            cell.add_i_dep(dep_ref);
-        }
-
-        Ok(())
-    }
-
-    pub fn evaluate(&mut self, str: String) -> Result<(Eval, HashSet<CellRef>), String> {
-        let (expr, deps) = parse(&str)?;
-
-        match self.evaluate_expr(&expr) {
-            Ok(it) => Ok((it, deps)),
-            Err(it) => Err(it),
-        }
-    }
-
-    fn evaluate_expr(&mut self, expr: &Expr) -> Result<Eval, String> {
-        let res = match expr {
-            Expr::Literal(lit) => Eval::Literal(lit.clone()),
-            Expr::CellRef(re) => self.get_cell(re.to_owned())?,
-            Expr::Infix { op, lhs, rhs } => {
-                let lval = self.evaluate_expr(lhs)?;
-                let rval = self.evaluate_expr(rhs)?;
-
-                match op {
-                    InfixOp::ADD => eval_add(&lval, &rval)?,
-                    InfixOp::SUB => eval_sub(&lval, &rval)?,
-                    InfixOp::MUL => eval_mul(&lval, &rval)?,
-                    InfixOp::DIV => eval_div(&lval, &rval)?,
-                    _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
-                }
+            match op {
+                InfixOp::ADD => eval_add(&lval, &rval)?,
+                InfixOp::SUB => eval_sub(&lval, &rval)?,
+                InfixOp::MUL => eval_mul(&lval, &rval)?,
+                InfixOp::DIV => eval_div(&lval, &rval)?,
+                _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
             }
-            Expr::Prefix { op, expr } => {
-                let val = self.evaluate_expr(expr)?;
+        }
+        Expr::Prefix { op, expr } => {
+            let val = evaluate_expr(expr, grid)?;
 
-                match op {
-                    PrefixOp::POS => eval_pos(&val)?,
-                    PrefixOp::NEG => eval_neg(&val)?,
-                    PrefixOp::NOT => eval_not(&val)?,
-                    _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
-                }
+            match op {
+                PrefixOp::POS => eval_pos(&val)?,
+                PrefixOp::NEG => eval_neg(&val)?,
+                PrefixOp::NOT => eval_not(&val)?,
+                // _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
             }
-            Expr::Group(g) => self.evaluate_expr(g)?,
-            it => return Err(format!("Evaluation error: Unsupported expression {:?}", it)),
-        };
+        }
+        Expr::Group(g) => evaluate_expr(g, grid)?,
+        it => return Err(format!("Evaluation error: Unsupported expression {:?}", it)),
+    };
 
-        Ok(res)
-    }
+    Ok(res)
 }
 
 fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
-            if let Some(res) = eval_numeric_infix(a, b, |x, y| x + y, |x, y| x + y) {
+            if let Some(res) = eval_numeric_infix(a, b, |x, y| x + y) {
                 return Ok(Eval::Literal(res));
             }
 
@@ -144,7 +88,7 @@ fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 fn eval_sub(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
-            if let Some(res) = eval_numeric_infix(a, b, |x, y| x - y, |x, y| x - y) {
+            if let Some(res) = eval_numeric_infix(a, b, |x, y| x - y) {
                 return Ok(Eval::Literal(res));
             }
 
@@ -155,7 +99,7 @@ fn eval_sub(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
-            if let Some(res) = eval_numeric_infix(a, b, |x, y| x * y, |x, y| x * y) {
+            if let Some(res) = eval_numeric_infix(a, b, |x, y| x * y) {
                 return Ok(Eval::Literal(res));
             }
 
@@ -166,15 +110,15 @@ fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
 fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
-            if let (Literal::Integer(_), Literal::Integer(y)) = (a, b) {
-                if *y == 0 {
+            if let (Literal::Number(_), Literal::Number(y)) = (a, b) {
+                if *y == 0f64 {
                     return Err(
                         "Evaluation error: integers attempted to divide by zero.".to_string()
                     );
                 }
             }
 
-            if let Some(res) = eval_numeric_infix(a, b, |x, y| x / y, |x, y| x / y) {
+            if let Some(res) = eval_numeric_infix(a, b, |x, y| x / y) {
                 return Ok(Eval::Literal(res));
             }
 
@@ -183,41 +127,23 @@ fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
     }
 }
 
-fn eval_numeric_infix<FInt, FDouble>(
-    lhs: &Literal,
-    rhs: &Literal,
-    int_op: FInt,
-    double_op: FDouble,
-) -> Option<Literal>
-where
-    FInt: Fn(i64, i64) -> i64,
-    FDouble: Fn(f64, f64) -> f64,
-{
+fn eval_numeric_infix(lhs: &Literal, rhs: &Literal, op: fn(f64, f64) -> f64) -> Option<Literal> {
     match (lhs, rhs) {
-        (Literal::Integer(a), Literal::Integer(b)) => Some(Literal::Integer(int_op(*a, *b))),
-        (Literal::Double(a), Literal::Double(b)) => Some(Literal::Double(double_op(*a, *b))),
-        (Literal::Integer(a), Literal::Double(b)) => {
-            Some(Literal::Double(double_op(*a as f64, *b)))
-        }
-        (Literal::Double(a), Literal::Integer(b)) => {
-            Some(Literal::Double(double_op(*a, *b as f64)))
-        }
+        (Literal::Number(a), Literal::Number(b)) => Some(Literal::Number(op(*a, *b))),
         _ => None,
     }
 }
 
 fn eval_pos(val: &Eval) -> Result<Eval, String> {
     match val {
-        Eval::Literal(Literal::Integer(it)) => Ok(Eval::Literal(Literal::Integer(*it))),
-        Eval::Literal(Literal::Double(it)) => Ok(Eval::Literal(Literal::Double(*it))),
+        Eval::Literal(Literal::Number(it)) => Ok(Eval::Literal(Literal::Number(*it))),
         _ => Err("Evaluation error: expected numeric type for POS function.".to_string()),
     }
 }
 
 fn eval_neg(val: &Eval) -> Result<Eval, String> {
     match val {
-        Eval::Literal(Literal::Integer(it)) => Ok(Eval::Literal(Literal::Integer(-it))),
-        Eval::Literal(Literal::Double(it)) => Ok(Eval::Literal(Literal::Double(-it))),
+        Eval::Literal(Literal::Number(it)) => Ok(Eval::Literal(Literal::Number(-it))),
         _ => Err("Evaluation error: expected numeric type for NEG function.".to_string()),
     }
 }

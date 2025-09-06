@@ -3,6 +3,8 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import { Toaster } from '$lib/components/ui/sonner/index.js';
 	import favicon from '$lib/assets/favicon.svg';
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import LeadSidebar from '$lib/components/ui/lead-sidebar/lead-sidebar.svelte';
 
 	let { children } = $props();
 </script>
@@ -13,4 +15,10 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children?.()}
+<Sidebar.Provider>
+	<LeadSidebar />
+
+	<main>
+		{@render children?.()}
+	</main>
+</Sidebar.Provider>

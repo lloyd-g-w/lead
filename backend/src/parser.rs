@@ -169,11 +169,9 @@ pub fn _parse(
 ) -> Result<Expr, String> {
     let mut lhs = match input.next() {
         Token::Literal(it) => Expr::Literal(it),
-        Token::Identifier(id) if id == "true" => Expr::Literal(Literal::Boolean(true)),
-        Token::Identifier(id) if id == "false" => Expr::Literal(Literal::Boolean(false)),
-        Token::Paren('(') => {
+        Token::OpenParen => {
             let lhs = _parse(input, 0, deps)?;
-            if input.next() != Token::Paren(')') {
+            if input.next() != Token::CloseParen {
                 return Err(format!("Parse error: expected closing paren."));
             }
             Expr::Group(Box::new(lhs))
@@ -194,14 +192,14 @@ pub fn _parse(
             }
         }
         Token::Identifier(id) => match input.peek() {
-            Token::Paren('(') => {
+            Token::OpenParen => {
                 input.next();
 
                 let mut args: Vec<Expr> = Vec::new();
                 loop {
                     let nxt = input.peek();
 
-                    if nxt == Token::Paren(')') {
+                    if nxt == Token::CloseParen {
                         input.next();
                         break;
                     } else if nxt != Token::Comma && args.len() != 0 {
@@ -285,7 +283,6 @@ pub fn _parse(
             };
         }
     }
-
 
     Ok(lhs)
 }

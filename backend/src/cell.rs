@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
+
 use crate::evaluator::*;
 
 #[derive(Clone)]
@@ -49,23 +51,24 @@ impl Cell {
     }
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct CellRef {
-    pub row: i64,
-    pub col: i64,
+    pub row: usize,
+    pub col: usize,
 }
 
 impl CellRef {
+    // Zero indexed
     pub fn new(s: String) -> Result<CellRef, String> {
         let s = s.trim();
-        let mut col: i64 = 0;
+        let mut col: usize = 0;
         let mut i = 0;
 
         // consume leading letters for the column
         for (idx, ch) in s.char_indices() {
             if ch.is_ascii_alphabetic() {
                 let u = ch.to_ascii_uppercase() as u8;
-                let val = (u - b'A' + 1) as i64; // A->1 ... Z->26
+                let val = (u - b'A' + 1) as usize; // A->1 ... Z->26
                 col = col * 26 + val;
                 i = idx + ch.len_utf8();
             } else {
@@ -90,8 +93,11 @@ impl CellRef {
             ));
         }
 
-        if let Ok(row) = row_part.parse::<i64>() {
-            Ok(CellRef { row, col })
+        if let Ok(row) = row_part.parse::<usize>() {
+            Ok(CellRef {
+                row: row - 1,
+                col: col - 1,
+            })
         } else {
             Err(format!("Parse error: invalid row number."))
         }

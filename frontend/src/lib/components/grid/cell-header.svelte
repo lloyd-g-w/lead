@@ -18,7 +18,7 @@
 		val: string;
 		active: boolean;
 		resizeable?: boolean;
-		direction?: 'col' | 'row';
+		direction?: 'col' | 'row' | 'blank';
 	} = $props();
 
 	// --- Drag Logic ---
@@ -62,7 +62,12 @@
 <div
 	style:width
 	style:height
-	class={clsx('placeholder group relative bg-background p-1 dark:bg-input/30', { active })}
+	class={clsx('placeholder group relative bg-background p-1', {
+		active,
+		col: direction === 'col',
+		row: direction === 'row',
+		blank: direction === 'blank'
+	})}
 >
 	<span class="pointer-events-none flex h-full w-full items-center justify-center select-none">
 		{val}
@@ -88,20 +93,34 @@
 		background-color: var(--color-background);
 	}
 
+	.placeholder.blank {
+		border: 1px solid var(--input);
+	}
+
+	.placeholder.blank,
+	.placeholder.row {
+		border-left: none;
+	}
+
+	.placeholder.blank,
+	.placeholder.col {
+		border-top: none;
+	}
+
 	.active {
-		border: 1px solid var(--color-primary);
 		background-color: color-mix(in oklab, var(--color-primary) 80%, var(--color-background) 80%);
+		font-weight: bold;
+		/* border: 1px solid var(--color-primary); */
 	}
 
 	/* --- Resizer Styles --- */
 	.resizer {
 		position: absolute;
-		/* Make it easier to grab */
-		z-index: 10;
 		/* Subtle visual cue, becomes more visible on hover */
 		background-color: var(--color-primary);
 		opacity: 0;
 		transition: opacity 0.1s ease-in-out;
+		z-index: 60;
 	}
 
 	/* Style for vertical (column) resizing */
@@ -113,7 +132,6 @@
 		height: 100%;
 	}
 
-	/* Style for horizontal (row) resizing */
 	.resizer-row {
 		cursor: row-resize;
 		bottom: -5px;
