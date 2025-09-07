@@ -42,3 +42,11 @@ export function colToStr(col: number): string {
 export function refToStr(row: number, col: number): string {
 	return colToStr(col) + (row + 1).toString();
 }
+
+export function getEvalLiteral(value: Eval): LiteralValue {
+	if (value === 'unset') return '';
+	if ('literal' in value) return value.literal.value;
+	if ('cellref' in value) return getEvalLiteral(value.cellref.eval);
+	// if ('range' in value) return 'err';
+	return 'todo!';
+}

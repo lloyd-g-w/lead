@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{cell::CellRef, tokenizer::Literal};
+use crate::{cell::CellRef, evaluator::Eval};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -16,6 +16,6 @@ pub struct LeadMsg {
     pub msg_type: MsgType,
     pub cell: Option<CellRef>,
     pub raw: Option<String>,
-    pub eval: Option<Literal>,
+    pub eval: Option<Eval>,
     pub bulk_msgs: Option<Vec<LeadMsg>>,
 }

@@ -11,10 +11,8 @@ use std::{env, io::Error};
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::{
-    evaluator::Eval,
     grid::Grid,
     messages::{LeadMsg, MsgType},
-    tokenizer::Literal,
 };
 
 #[tokio::main]
@@ -70,15 +68,11 @@ async fn accept_connection(stream: TcpStream) {
 
                                 for update in &updates {
                                     if let Ok(cell) = grid.get_cell(*update) {
-                                        let Eval::Literal(lit) = cell.eval() else {
-                                            continue;
-                                        };
-
                                         msgs.push(LeadMsg {
                                             msg_type: MsgType::Set,
                                             cell: Some(*update),
                                             raw: Some(cell.raw()),
-                                            eval: Some(lit),
+                                            eval: Some(cell.eval()),
                                             bulk_msgs: None,
                                         });
                                     }

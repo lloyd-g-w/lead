@@ -3,7 +3,7 @@
 	import Cell from '$lib/components/grid/cell.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
-	import { colToStr, refToStr, type CellT } from './utils';
+	import { colToStr, getEvalLiteral, refToStr, type CellT } from './utils';
 	import clsx from 'clsx';
 
 	let {
@@ -44,7 +44,7 @@
 					console.error('Expected cell value for SET msgponse from server.');
 					return;
 				}
-				setCellVal(msg.cell.row, msg.cell.col, msg.eval.value);
+				setCellVal(msg.cell.row, msg.cell.col, getEvalLiteral(msg.eval));
 				break;
 			}
 			case 'bulk': {

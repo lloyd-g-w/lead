@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::cell::CellRef;
 use crate::grid::Grid;
 use crate::parser::*;
@@ -5,7 +7,8 @@ use crate::tokenizer::Literal;
 use std::collections::HashSet;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Eval {
     Literal(Literal),
     CellRef { eval: Box<Eval>, reference: CellRef },
