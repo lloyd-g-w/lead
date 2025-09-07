@@ -60,8 +60,17 @@ fn evaluate_expr(
             }
         }
         Expr::Infix { op, lhs, rhs } => {
-            let lval = evaluate_expr(lhs, precs, grid)?;
-            let rval = evaluate_expr(rhs, precs, grid)?;
+            let mut lval = evaluate_expr(lhs, precs, grid)?;
+            let mut rval = evaluate_expr(rhs, precs, grid)?;
+
+            if !matches!(op, InfixOp::RANGE) {
+                if let Eval::CellRef { eval, reference: _ } = lval {
+                    lval = *eval;
+                }
+                if let Eval::CellRef { eval, reference: _ } = rval {
+                    rval = *eval;
+                }
+            }
 
             match op {
                 InfixOp::ADD => eval_add(&lval, &rval)?,
