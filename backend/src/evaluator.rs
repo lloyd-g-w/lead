@@ -82,7 +82,11 @@ fn evaluate_expr(
             }
         }
         Expr::Prefix { op, expr } => {
-            let val = evaluate_expr(expr, precs, grid)?;
+            let mut val = evaluate_expr(expr, precs, grid)?;
+
+            if let Eval::CellRef { eval, reference: _ } = val {
+                val = *eval;
+            }
 
             match op {
                 PrefixOp::POS => eval_pos(&val)?,
