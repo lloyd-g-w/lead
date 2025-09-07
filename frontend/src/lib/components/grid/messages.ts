@@ -1,8 +1,9 @@
 interface LeadMsg {
-	msg_type: 'set' | 'get' | 'error';
+	msg_type: 'set' | 'get' | 'error' | 'bulk';
 	cell?: CellRef;
 	raw?: string;
 	eval?: Literal;
+	bulk_msgs?: Array<LeadMsg>;
 }
 
 interface CellRef {

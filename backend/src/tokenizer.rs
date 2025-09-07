@@ -19,6 +19,8 @@ pub enum Token {
     Eof,
 }
 
+pub const OPERATORS_STR: &str = "+-*/^!%&|:";
+
 pub struct Tokenizer {
     pub tokens: Vec<Token>,
 }
@@ -97,7 +99,7 @@ impl Tokenizer {
                     string.push(ch);
                 }
                 tokens.push(Token::Literal(Literal::String(string)));
-            } else if "+-*/^!%&|".contains(c) {
+            } else if OPERATORS_STR.contains(c) {
                 tokens.push(Token::Operator(c));
                 chars.next();
             } else if "()".contains(c) {

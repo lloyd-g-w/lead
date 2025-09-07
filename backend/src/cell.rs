@@ -4,57 +4,91 @@ use serde::{Deserialize, Serialize};
 
 use crate::evaluator::*;
 
-#[derive(Clone)]
-pub struct Cell {
-    eval: Eval,
-    raw: String,
-    i_dep: HashSet<CellRef>,
-    they_dep: HashSet<CellRef>,
-}
-
-impl Cell {
-    pub fn new(eval: Eval, raw: String) -> Self {
-        Self {
-            eval,
-            raw,
-            i_dep: HashSet::new(),
-            they_dep: HashSet::new(),
-        }
-    }
-
-    pub fn raw(&self) -> String {
-        self.raw.clone()
-    }
-
-    pub fn eval(&self) -> Eval {
-        self.eval.clone()
-    }
-
-    pub fn add_i_dep(&mut self, dep: CellRef) {
-        self.i_dep.insert(dep);
-    }
-
-    pub fn add_they_dep(&mut self, dep: CellRef) {
-        self.they_dep.insert(dep);
-    }
-
-    pub fn clear_i_dep(&mut self) {
-        self.i_dep.clear();
-    }
-
-    pub fn clear_they_dep(&mut self) {
-        self.they_dep.clear();
-    }
-
-    pub fn set_eval(&mut self, eval: Eval) {
-        self.eval = eval;
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct CellRef {
     pub row: usize,
     pub col: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct Cell {
+    reference: CellRef,
+    eval: Eval,
+    raw: String,
+    precedents: HashSet<CellRef>, // Cells that this cell reads
+    dependents: HashSet<CellRef>, // Cells that read this cell
+}
+
+impl Cell {
+    pub fn new(reference: CellRef, eval: Eval, raw: String) -> Self {
+        Self {
+            reference,
+            eval,
+            raw,
+            precedents: HashSet::new(),
+            dependents: HashSet::new(),
+        }
+    }
+
+    pub fn new_all(
+        reference: CellRef,
+        eval: Eval,
+        raw: String,
+        precedents: HashSet<CellRef>,
+        dependents: HashSet<CellRef>,
+    ) -> Self {
+        Self {
+            reference,
+            eval,
+            raw,
+            precedents,
+            dependents,
+        }
+    }
+
+    pub fn raw(&self) -> String {
+        self.raw.to_owned()
+    }
+    pub fn eval(&self) -> Eval {
+        self.eval.to_owned()
+    }
+    pub fn reference(&self) -> CellRef {
+        self.reference.to_owned()
+    }
+
+    pub fn set_raw(&mut self, raw: String) {
+        self.raw = raw;
+    }
+    pub fn set_eval(&mut self, eval: Eval) {
+        self.eval = eval;
+    }
+    pub fn set_ref(&mut self, reference: CellRef) {
+        self.reference = reference;
+    }
+
+    pub fn add_dep(&mut self, it: CellRef) {
+        self.dependents.insert(it);
+    }
+
+    pub fn remove_dep(&mut self, it: &CellRef) {
+        self.dependents.remove(&it);
+    }
+
+    pub fn add_prec(&mut self, it: CellRef) {
+        self.precedents.insert(it);
+    }
+
+    pub fn set_precs(&mut self, it: HashSet<CellRef>) {
+        self.precedents = it;
+    }
+
+    pub fn deps(&self) -> HashSet<CellRef> {
+        self.dependents.to_owned()
+    }
+
+    pub fn precs(&self) -> HashSet<CellRef> {
+        self.precedents.to_owned()
+    }
 }
 
 impl CellRef {

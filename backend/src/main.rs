@@ -14,6 +14,7 @@ use crate::{
     evaluator::Eval,
     grid::Grid,
     messages::{LeadMsg, MsgType},
+    tokenizer::Literal,
 };
 
 #[tokio::main]
@@ -63,26 +64,45 @@ async fn accept_connection(stream: TcpStream) {
                         let Some(cell_ref) = req.cell else { continue };
                         let Some(raw) = req.raw else { continue };
 
-                        match grid.set_cell(cell_ref.clone(), raw.to_owned()) {
-                            Ok(eval) => match eval {
-                                Eval::Literal(lit) => {
-                                    let res = LeadMsg {
-                                        msg_type: MsgType::Set,
-                                        cell: Some(cell_ref),
-                                        raw: Some(raw.to_string()),
-                                        eval: Some(lit),
-                                    };
-                                    let _ = write
-                                        .send(serde_json::to_string(&res).unwrap().into())
-                                        .await;
+                        match grid.update_cell(cell_ref.clone(), raw.to_owned()) {
+                            Ok(updates) => {
+                                let mut msgs = Vec::new();
+
+                                for update in &updates {
+                                    if let Ok(cell) = grid.get_cell(*update) {
+                                        let Eval::Literal(lit) = cell.eval() else {
+                                            continue;
+                                        };
+
+                                        msgs.push(LeadMsg {
+                                            msg_type: MsgType::Set,
+                                            cell: Some(*update),
+                                            raw: Some(cell.raw()),
+                                            eval: Some(lit),
+                                            bulk_msgs: None,
+                                        });
+                                    }
                                 }
-                            },
+
+                                let msg = LeadMsg {
+                                    cell: None,
+                                    raw: None,
+                                    eval: None,
+                                    bulk_msgs: Some(msgs),
+                                    msg_type: MsgType::Bulk,
+                                };
+
+                                let _ = write
+                                    .send(serde_json::to_string(&msg).unwrap().into())
+                                    .await;
+                            }
                             Err(e) => {
                                 let res = LeadMsg {
                                     msg_type: MsgType::Error,
                                     cell: Some(cell_ref),
                                     raw: Some(e.to_string()),
                                     eval: None,
+                                    bulk_msgs: None,
                                 };
                                 let _ = write
                                     .send(serde_json::to_string(&res).unwrap().into())

@@ -25,26 +25,38 @@
 			return;
 		}
 
-		switch (res.msg_type) {
+		handle_msg(res);
+	};
+
+	function handle_msg(msg: LeadMsg) {
+		switch (msg.msg_type) {
 			case 'error': {
 				toast.error('Error', {
-					description: res.raw
+					description: msg.raw
 				});
 				break;
 			}
 			case 'set': {
-				if (res.cell === undefined) {
-					console.error('Expected cell ref for SET response from server.');
+				if (msg.cell === undefined) {
+					console.error('Expected cell ref for SET msgponse from server.');
 					return;
-				} else if (res.eval === undefined) {
-					console.error('Expected cell value for SET response from server.');
+				} else if (msg.eval === undefined) {
+					console.error('Expected cell value for SET msgponse from server.');
 					return;
 				}
-				setCellVal(res.cell.row, res.cell.col, res.eval.value);
+				setCellVal(msg.cell.row, msg.cell.col, msg.eval.value);
 				break;
 			}
+			case 'bulk': {
+				if (msg.bulk_msgs === undefined) {
+					console.error('Expected bulk_msgs field to be defined for BULK message.');
+					return;
+				}
+
+				for (const m of msg.bulk_msgs) handle_msg(m);
+			}
 		}
-	};
+	}
 
 	let rows = 50;
 	let cols = 40;

@@ -1,3 +1,5 @@
+use log::info;
+
 use crate::{cell::CellRef, tokenizer::*};
 use std::{collections::HashSet, fmt};
 
@@ -21,6 +23,7 @@ pub enum InfixOp {
     SUB,
     AND,
     OR,
+    RANGE,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -57,6 +60,7 @@ pub trait Precedence {
 impl Precedence for InfixOp {
     fn prec(&self) -> (u8, u8) {
         match self {
+            InfixOp::RANGE => (7, 8),
             InfixOp::MUL | InfixOp::DIV | InfixOp::AND => (3, 4),
             InfixOp::ADD | InfixOp::SUB | InfixOp::OR => (1, 2),
         }
@@ -157,20 +161,21 @@ impl Expr {
 
 pub fn parse(input: &str) -> Result<(Expr, HashSet<CellRef>), String> {
     let mut tokenizer = Tokenizer::new(input)?;
-    // println!("{:?}", tokenizer.tokens);
-    let mut deps = HashSet::new();
-    Ok((_parse(&mut tokenizer, 0, &mut deps)?, deps))
+    let mut precs = HashSet::new();
+    let expr = _parse(&mut tokenizer, 0, &mut precs)?;
+    info!("{}", expr.pretty());
+    Ok((expr, precs))
 }
 
 pub fn _parse(
     input: &mut Tokenizer,
     min_prec: u8,
-    deps: &mut HashSet<CellRef>,
+    precedents: &mut HashSet<CellRef>,
 ) -> Result<Expr, String> {
     let mut lhs = match input.next() {
         Token::Literal(it) => Expr::Literal(it),
         Token::OpenParen => {
-            let lhs = _parse(input, 0, deps)?;
+            let lhs = _parse(input, 0, precedents)?;
             if input.next() != Token::CloseParen {
                 return Err(format!("Parse error: expected closing paren."));
             }
@@ -184,7 +189,7 @@ pub fn _parse(
                 it => return Err(format!("Parse error: unknown prefix operator {:?}.", it)),
             };
 
-            let rhs = _parse(input, prefix_op.prec().1, deps)?;
+            let rhs = _parse(input, prefix_op.prec().1, precedents)?;
 
             Expr::Prefix {
                 op: prefix_op,
@@ -213,7 +218,7 @@ pub fn _parse(
                         input.next(); // Skip comma
                     }
 
-                    let arg = _parse(input, 0, deps)?;
+                    let arg = _parse(input, 0, precedents)?;
                     args.push(arg);
                 }
 
@@ -224,7 +229,7 @@ pub fn _parse(
             }
             _ => {
                 let cell_ref = CellRef::new(id)?;
-                deps.insert(cell_ref);
+                precedents.insert(cell_ref);
                 Expr::CellRef(cell_ref)
             }
         },
@@ -235,7 +240,7 @@ pub fn _parse(
     // In the reference article this is a loop with match
     // statement that breaks on Eof and closing paren but this is simpler and works as expected
     while let Token::Operator(op) = input.peek() {
-        if "+-*/&|".contains(op) {
+        if OPERATORS_STR.contains(op) {
             let infix_op = match op {
                 '+' => InfixOp::ADD,
                 '-' => InfixOp::SUB,
@@ -243,6 +248,7 @@ pub fn _parse(
                 '/' => InfixOp::DIV,
                 '&' => InfixOp::AND,
                 '|' => InfixOp::OR,
+                ':' => InfixOp::RANGE,
                 it => {
                     return Err(format!("Parse error: do not know infix operator {:?}.", it));
                 }
@@ -254,7 +260,7 @@ pub fn _parse(
             }
 
             input.next();
-            let rhs = _parse(input, r_prec, deps)?;
+            let rhs = _parse(input, r_prec, precedents)?;
             lhs = Expr::Infix {
                 op: infix_op,
                 lhs: Box::new(lhs),

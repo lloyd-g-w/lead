@@ -8,6 +8,7 @@ pub enum MsgType {
     Set,
     Get,
     Error,
+    Bulk,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -16,4 +17,5 @@ pub struct LeadMsg {
     pub cell: Option<CellRef>,
     pub raw: Option<String>,
     pub eval: Option<Literal>,
+    pub bulk_msgs: Option<Vec<LeadMsg>>,
 }
