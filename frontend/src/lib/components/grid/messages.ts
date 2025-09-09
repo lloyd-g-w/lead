@@ -25,5 +25,16 @@ interface EvalCellRef {
 	reference: CellRef;
 }
 
+interface LeadErr {
+	code: 'DivZero' | 'TypeErr' | 'Syntax' | 'Server' | 'Unsupported';
+	desc: string;
+	title: string;
+}
+
 // Tagged union
-type Eval = { literal: Literal } | { cellref: EvalCellRef } | { range: Range } | 'unset';
+type Eval =
+	| { literal: Literal }
+	| { cellref: EvalCellRef }
+	| { range: Range }
+	| { err: LeadErr }
+	| 'unset';

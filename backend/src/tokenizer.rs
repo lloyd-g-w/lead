@@ -1,18 +1,11 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", content = "value")]
-pub enum Literal {
-    Number(f64),
-    Boolean(bool),
-    String(String),
-}
+use crate::common::{LeadErr, LeadErrCode, Literal};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Identifier(String), // Could be a function
     Literal(Literal),
     Operator(char),
+    Err(LeadErr),
     OpenParen,
     CloseParen,
     Comma,
@@ -26,7 +19,7 @@ pub struct Tokenizer {
 }
 
 impl Tokenizer {
-    pub fn new(input: &str) -> Result<Tokenizer, String> {
+    pub fn new(input: &str) -> Result<Tokenizer, LeadErr> {
         let mut tokens = Vec::new();
         let mut chars = input.chars().peekable();
 
@@ -113,7 +106,11 @@ impl Tokenizer {
                 tokens.push(Token::Comma);
                 chars.next();
             } else {
-                return Err(format!("Encountered unknown token char: {c}"));
+                return Err(LeadErr {
+                    title: "Tokenizer error.".into(),
+                    desc: format!("Encountered unknown token char: {c}"),
+                    code: LeadErrCode::Syntax,
+                });
             }
         }
 

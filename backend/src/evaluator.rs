@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
 use crate::cell::CellRef;
+use crate::common::LeadErr;
+use crate::common::LeadErrCode;
+use crate::common::Literal;
 use crate::grid::Grid;
 use crate::parser::*;
-use crate::tokenizer::Literal;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -13,6 +15,7 @@ pub enum Eval {
     Literal(Literal),
     CellRef { eval: Box<Eval>, reference: CellRef },
     Range(Vec<Eval>),
+    Err(LeadErr),
     Unset,
 }
 
@@ -23,19 +26,22 @@ impl fmt::Display for Eval {
             Eval::Range(it) => write!(f, "Range({it:?})"),
             Eval::CellRef { eval, reference } => write!(f, "EvalRef({eval:?}, {reference:?})"),
             Eval::Unset => write!(f, "Unset"),
+            Eval::Err(it) => write!(f, "{it:?}"),
         }
     }
 }
 
-pub fn evaluate(str: String, grid: Option<&Grid>) -> Result<(Eval, HashSet<CellRef>), String> {
-    let (expr, _) = parse(&str)?;
+pub fn evaluate(str: String, grid: Option<&Grid>) -> (Eval, HashSet<CellRef>) {
+    match parse(&str) {
+        Ok((expr, _)) => {
+            let mut precs = HashSet::new();
 
-    let mut precs = HashSet::new();
-
-    // Make evaulator adds precs for ranges
-    match evaluate_expr(&expr, &mut precs, grid) {
-        Ok(it) => Ok((it, precs)),
-        Err(it) => Err(it),
+            match evaluate_expr(&expr, &mut precs, grid) {
+                Ok(it) => (it, precs),
+                Err(it) => (Eval::Err(it), precs),
+            }
+        }
+        Err(e) => (Eval::Err(e), HashSet::new()),
     }
 }
 
@@ -43,7 +49,7 @@ fn evaluate_expr(
     expr: &Expr,
     precs: &mut HashSet<CellRef>,
     grid: Option<&Grid>,
-) -> Result<Eval, String> {
+) -> Result<Eval, LeadErr> {
     let res = match expr {
         Expr::Literal(lit) => Eval::Literal(lit.clone()),
         Expr::CellRef(re) => {
@@ -59,7 +65,11 @@ fn evaluate_expr(
                     },
                 }
             } else {
-                return Err("Evaluation error: Found cell reference but no grid.".into());
+                return Err(LeadErr {
+                    title: "Evaluation error.".into(),
+                    desc: "Found cell reference with no grid.".into(),
+                    code: LeadErrCode::Server,
+                });
             }
         }
         Expr::Infix { op, lhs, rhs } => {
@@ -81,7 +91,13 @@ fn evaluate_expr(
                 InfixOp::MUL => eval_mul(&lval, &rval)?,
                 InfixOp::DIV => eval_div(&lval, &rval)?,
                 InfixOp::RANGE => eval_range(&lval, &rval, precs, grid)?,
-                _ => return Err(format!("Evaluation error: Unsupported operator {:?}", op)),
+                _ => {
+                    return Err(LeadErr {
+                        title: "Evaluation error.".into(),
+                        desc: format!("Unsupported operator {:?}", op),
+                        code: LeadErrCode::Unsupported,
+                    });
+                }
             }
         }
         Expr::Prefix { op, expr } => {
@@ -101,9 +117,21 @@ fn evaluate_expr(
         Expr::Group(g) => evaluate_expr(g, precs, grid)?,
         Expr::Function { name, args } => match name.as_str() {
             "AVG" => eval_avg(args, precs, grid)?,
-            it => return Err(format!("Evaluation error: Unsupported function {}.", it)),
+            it => {
+                return Err(LeadErr {
+                    title: "Evaluation error.".into(),
+                    desc: format!("Unsupported function {:?}", it),
+                    code: LeadErrCode::Unsupported,
+                });
+            }
         },
-        it => return Err(format!("Evaluation error: Unsupported expression {:?}", it)),
+        it => {
+            return Err(LeadErr {
+                title: "Evaluation error.".into(),
+                desc: format!("Unsupported expression {:?}", it),
+                code: LeadErrCode::Unsupported,
+            });
+        }
     };
 
     Ok(res)
@@ -114,7 +142,7 @@ fn eval_range(
     rval: &Eval,
     precs: &mut HashSet<CellRef>,
     grid: Option<&Grid>,
-) -> Result<Eval, String> {
+) -> Result<Eval, LeadErr> {
     match (lval, rval) {
         (
             Eval::CellRef {
@@ -139,7 +167,11 @@ fn eval_range(
                     let reference = CellRef { row, col };
 
                     let Some(g) = grid else {
-                        return Err("Evaluation error: Found cell range but no grid.".into());
+                        return Err(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: "Found cell range but no grid.".into(),
+                            code: LeadErrCode::Server,
+                        });
                     };
 
                     cells.push(Eval::CellRef {
@@ -157,7 +189,11 @@ fn eval_range(
 
             Ok(Eval::Range(cells))
         }
-        _ => Err("Evaluation error: expected cellref types for RANGE function.".to_string()),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected cell reference types for RANGE function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
     }
 }
 
@@ -165,7 +201,7 @@ fn eval_avg(
     args: &Vec<Expr>,
     precs: &mut HashSet<CellRef>,
     grid: Option<&Grid>,
-) -> Result<Eval, String> {
+) -> Result<Eval, LeadErr> {
     let mut res = 0.0;
     let mut count = 0;
 
@@ -178,7 +214,11 @@ fn eval_avg(
             Eval::Range(range) => {
                 for cell in range {
                     let Eval::CellRef { eval, reference: _ } = cell else {
-                        panic!("Found non cellref in evaluation time RANGE!.");
+                        return Err(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: "Found non-cellref in RANGE during AVG evaluation.".into(),
+                            code: LeadErrCode::Server,
+                        });
                     };
 
                     if let Eval::Literal(Literal::Number(num)) = *eval {
@@ -187,27 +227,36 @@ fn eval_avg(
                     } else if matches!(*eval, Eval::Unset) {
                         continue;
                     } else {
-                        return Err("Evaluation error: expected numeric types for AVG function."
-                            .to_string());
+                        return Err(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: "Expected numeric types for AVG function.".into(),
+                            code: LeadErrCode::Unsupported,
+                        });
                     }
                 }
             }
             _ => {
-                return Err(
-                    "Evaluation error: expected numeric types for AVG function.".to_string()
-                );
+                return Err(LeadErr {
+                    title: "Evaluation error.".into(),
+                    desc: "Expected numeric types for AVG function.".into(),
+                    code: LeadErrCode::Unsupported,
+                });
             }
         }
     }
 
     if count == 0 {
-        Err("Evaluation error: attempted to divide by zero.".to_string())
+        Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Attempted to divide by zero.".into(),
+            code: LeadErrCode::DivZero,
+        })
     } else {
         Ok(Eval::Literal(Literal::Number(res / count as f64)))
     }
 }
 
-fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
+fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
             if let Some(res) = eval_numeric_infix(a, b, |x, y| x + y) {
@@ -221,46 +270,72 @@ fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
                 return Ok(Eval::Literal(Literal::String(res)));
             }
 
-            Err("Evaluation error: expected string or numeric types for ADD function.".to_string())
+            Err(LeadErr {
+                title: "Evaluation error.".into(),
+                desc: "Expected string or numeric types for ADD function.".into(),
+                code: LeadErrCode::Unsupported,
+            })
         }
-        _ => {
-            Err("Evaluation error: expected string or numeric types for ADD function.".to_string())
-        }
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected string or numeric types for ADD function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
     }
 }
 
-fn eval_sub(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
+fn eval_sub(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
             if let Some(res) = eval_numeric_infix(a, b, |x, y| x - y) {
                 return Ok(Eval::Literal(res));
             }
 
-            Err("Evaluation error: expected numeric types for SUB function.".to_string())
+            Err(LeadErr {
+                title: "Evaluation error.".into(),
+                desc: "Expected numeric types for SUB function.".into(),
+                code: LeadErrCode::Unsupported,
+            })
         }
-        _ => Err("Evaluation error: expected numeric types for SUB function.".to_string()),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected numeric types for SUB function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
     }
 }
-fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
+
+fn eval_mul(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
             if let Some(res) = eval_numeric_infix(a, b, |x, y| x * y) {
                 return Ok(Eval::Literal(res));
             }
 
-            Err("Evaluation error: expected numeric types for MUL function.".to_string())
+            Err(LeadErr {
+                title: "Evaluation error.".into(),
+                desc: "Expected numeric types for MUL function.".into(),
+                code: LeadErrCode::Unsupported,
+            })
         }
-        _ => Err("Evaluation error: expected numeric types for MUL function.".to_string()),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected numeric types for MUL function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
     }
 }
-fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
+
+fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {
     match (lval, rval) {
         (Eval::Literal(a), Eval::Literal(b)) => {
             if let (Literal::Number(_), Literal::Number(y)) = (a, b) {
                 if *y == 0f64 {
-                    return Err(
-                        "Evaluation error: integers attempted to divide by zero.".to_string()
-                    );
+                    return Err(LeadErr {
+                        title: "Evaluation error.".into(),
+                        desc: "Attempted to divide by zero.".into(),
+                        code: LeadErrCode::DivZero,
+                    });
                 }
             }
 
@@ -268,9 +343,50 @@ fn eval_div(lval: &Eval, rval: &Eval) -> Result<Eval, String> {
                 return Ok(Eval::Literal(res));
             }
 
-            Err("Evaluation error: expected numeric types for DIV function.".to_string())
+            Err(LeadErr {
+                title: "Evaluation error.".into(),
+                desc: "Expected numeric types for DIV function.".into(),
+                code: LeadErrCode::Unsupported,
+            })
         }
-        _ => Err("Evaluation error: expected numeric types for DIV  function.".to_string()),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected numeric types for DIV function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
+    }
+}
+
+fn eval_pos(val: &Eval) -> Result<Eval, LeadErr> {
+    match val {
+        Eval::Literal(Literal::Number(it)) => Ok(Eval::Literal(Literal::Number(*it))),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected numeric type for POS function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
+    }
+}
+
+fn eval_neg(val: &Eval) -> Result<Eval, LeadErr> {
+    match val {
+        Eval::Literal(Literal::Number(it)) => Ok(Eval::Literal(Literal::Number(-it))),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected numeric type for NEG function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
+    }
+}
+
+fn eval_not(val: &Eval) -> Result<Eval, LeadErr> {
+    match val {
+        Eval::Literal(Literal::Boolean(it)) => Ok(Eval::Literal(Literal::Boolean(!it))),
+        _ => Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Expected boolean type for NOT function.".into(),
+            code: LeadErrCode::Unsupported,
+        }),
     }
 }
 
@@ -278,25 +394,5 @@ fn eval_numeric_infix(lhs: &Literal, rhs: &Literal, op: fn(f64, f64) -> f64) -> 
     match (lhs, rhs) {
         (Literal::Number(a), Literal::Number(b)) => Some(Literal::Number(op(*a, *b))),
         _ => None,
-    }
-}
-
-fn eval_pos(val: &Eval) -> Result<Eval, String> {
-    match val {
-        Eval::Literal(Literal::Number(it)) => Ok(Eval::Literal(Literal::Number(*it))),
-        _ => Err("Evaluation error: expected numeric type for POS function.".to_string()),
-    }
-}
-
-fn eval_neg(val: &Eval) -> Result<Eval, String> {
-    match val {
-        Eval::Literal(Literal::Number(it)) => Ok(Eval::Literal(Literal::Number(-it))),
-        _ => Err("Evaluation error: expected numeric type for NEG function.".to_string()),
-    }
-}
-fn eval_not(val: &Eval) -> Result<Eval, String> {
-    match val {
-        Eval::Literal(Literal::Boolean(it)) => Ok(Eval::Literal(Literal::Boolean(!it))),
-        _ => Err("Evaluation error: expected boolean type for NEG function.".to_string()),
     }
 }

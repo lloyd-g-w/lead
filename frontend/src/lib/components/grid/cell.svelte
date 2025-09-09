@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
 	import clsx from 'clsx';
+	import type { CellT } from './utils';
 
 	let {
 		cla = '',
 		width = '80px',
 		height = '30px',
-		raw_val = $bindable(''),
-		val = undefined,
+		cell = $bindable(undefined),
 		onmousedown = () => {},
 		startediting = () => {},
 		stopediting = () => {},
@@ -17,8 +17,7 @@
 		cla?: string;
 		width?: string;
 		height?: string;
-		raw_val?: string;
-		val?: LiteralValue | undefined;
+		cell?: CellT;
 		onmousedown?: (e: MouseEvent) => void;
 		startediting?: () => void;
 		stopediting?: () => void;
@@ -31,7 +30,7 @@
 		queueMicrotask(() => {
 			const el = node.querySelector('input') as HTMLInputElement | null;
 			if (el !== null) {
-				el.value = raw_val;
+				el.value = cell?.raw_val ?? '';
 				el.focus();
 			}
 		});
@@ -56,7 +55,11 @@
 			class="relative rounded-none p-1 !transition-none delay-0 duration-0
 			focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
 			onblur={(e) => {
-				raw_val = (e.target as HTMLInputElement).value;
+				cell = {
+					isErr: false,
+					val: undefined,
+					raw_val: (e.target as HTMLInputElement).value
+				};
 				stopediting();
 			}}
 		/>
@@ -69,12 +72,12 @@
 		style:height
 		class={clsx('placeholder bg-background p-1', { active }, cla)}
 	>
-		{#if raw_val !== '' || val !== ''}
-			<span class="pointer-events-none select-none">
-				{#if val !== undefined}
-					{val}
+		{#if cell && (cell.raw_val !== '' || cell.val !== '')}
+			<span class={clsx('pointer-events-none select-none', { err: cell.isErr })}>
+				{#if cell.val}
+					{cell.val}
 				{:else}
-					{raw_val}
+					{cell.raw_val}
 				{/if}
 			</span>
 		{/if}
@@ -93,5 +96,22 @@
 		z-index: 20;
 		border: 1px solid var(--color-primary);
 		outline: 1px solid var(--color-primary);
+	}
+
+	.active:has(.err),
+	.placeholder:has(.err) {
+		position: relative; /* needed for absolute positioning */
+	}
+
+	.active:has(.err)::after,
+	.placeholder:has(.err)::after {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: 0;
+		width: 0;
+		height: 0;
+		border-top: 12px solid red; /* size & color of the triangle */
+		border-left: 12px solid transparent;
 	}
 </style>

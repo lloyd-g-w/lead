@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::evaluator::*;
+use crate::{
+    common::{LeadErr, LeadErrCode},
+    evaluator::*,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct CellRef {
@@ -93,7 +96,7 @@ impl Cell {
 
 impl CellRef {
     // Zero indexed
-    pub fn new(s: String) -> Result<CellRef, String> {
+    pub fn new(s: String) -> Result<CellRef, LeadErr> {
         let s = s.trim();
         let mut col: usize = 0;
         let mut i = 0;
@@ -111,20 +114,26 @@ impl CellRef {
         }
 
         if col <= 0 {
-            return Err(format!(
-                "Parse error: missing column letters in cell ref: {s}"
-            ));
+            return Err(LeadErr {
+                title: "Parse error.".into(),
+                desc: format!("Missing column letters in cell ref: {s}."),
+                code: LeadErrCode::Syntax,
+            });
         }
 
         let row_part = &s[i..];
         if row_part.is_empty() {
-            return Err(format!(
-                "Parse error: missing column letters in cell ref: {s}"
-            ));
+            return Err(LeadErr {
+                title: "Parse error.".into(),
+                desc: format!("Missing column letters in cell ref: {s}."),
+                code: LeadErrCode::Syntax,
+            });
         } else if !row_part.chars().all(|c| c.is_ascii_digit()) {
-            return Err(format!(
-                "Parse error: row part must be numeric in cell ref: {s}"
-            ));
+            return Err(LeadErr {
+                title: "Parse error.".into(),
+                desc: format!("Row part must be numeric in cell ref: {s}."),
+                code: LeadErrCode::Syntax,
+            });
         }
 
         if let Ok(row) = row_part.parse::<usize>() {
@@ -133,7 +142,11 @@ impl CellRef {
                 col: col - 1,
             })
         } else {
-            Err(format!("Parse error: invalid row number."))
+            Err(LeadErr {
+                title: "Parse error.".into(),
+                desc: format!("Invalid row number."),
+                code: LeadErrCode::Syntax,
+            })
         }
     }
 }

@@ -4,8 +4,8 @@ use log::info;
 
 use crate::{
     cell::{Cell, CellRef},
+    common::Literal,
     evaluator::{Eval, evaluate},
-    tokenizer::Literal,
 };
 
 pub struct Grid {
@@ -36,7 +36,7 @@ impl Grid {
             eval = Eval::Literal(Literal::String(raw_val.to_owned()));
         } else {
             // Evaluate raw expr and get precedents
-            let (res_eval, res_precs) = evaluate(raw_val[1..].to_owned(), Some(&self))?;
+            let (res_eval, res_precs) = evaluate(raw_val[1..].to_owned(), Some(&self));
             eval = res_eval;
             precs = res_precs;
         }
@@ -88,7 +88,7 @@ impl Grid {
         search_set.extend(cell_data.deps().iter());
 
         temp.insert(from);
-        perm.insert(from);
+        perm.insert(from); // Make this inside the inner topo_visit
 
         let mut searched = 1;
 
@@ -249,7 +249,7 @@ impl Grid {
             };
 
             // Now we dropped the borrow of self.cells before this point
-            let (e, _) = evaluate(raw, Some(self))?;
+            let (e, _) = evaluate(raw, Some(self));
 
             if let Some(cell) = self.cells.get_mut(&cell_ref) {
                 cell.set_eval(e);

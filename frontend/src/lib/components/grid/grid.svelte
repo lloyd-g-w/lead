@@ -3,7 +3,7 @@
 	import Cell from '$lib/components/grid/cell.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
-	import { colToStr, getEvalLiteral, refToStr, type CellT } from './utils';
+	import { colToStr, getEvalLiteral, isErr, refToStr, type CellT } from './utils';
 	import clsx from 'clsx';
 
 	let {
@@ -44,7 +44,7 @@
 					console.error('Expected cell value for SET msgponse from server.');
 					return;
 				}
-				setCellVal(msg.cell.row, msg.cell.col, getEvalLiteral(msg.eval));
+				setCellVal(msg.cell.row, msg.cell.col, getEvalLiteral(msg.eval), isErr(msg.eval));
 				break;
 			}
 			case 'bulk': {
@@ -107,38 +107,41 @@
 
 	const key = (i: number, j: number) => `${i}:${j}`;
 
-	const getCell = (i: number, j: number) => grid_vals[key(i, j)] ?? undefined;
+	const getCell = (i: number, j: number) => grid_vals[key(i, j)];
 
 	const getCellRaw = (i: number, j: number) => getCell(i, j)?.raw_val ?? '';
 	const setCellRaw = (i: number, j: number, val: string) => {
 		if (grid_vals[key(i, j)] === undefined) {
 			grid_vals[key(i, j)] = {
 				raw_val: val,
+				isErr: false,
 				val: undefined
 			};
 		} else {
 			grid_vals[key(i, j)].raw_val = val;
 		}
 	};
-	const getCellVal = (i: number, j: number) => getCell(i, j)?.val ?? undefined;
-	const setCellVal = (i: number, j: number, val: LiteralValue) => {
+	const getCellVal = (i: number, j: number) => getCell(i, j);
+	const setCellVal = (i: number, j: number, val: LiteralValue, isErr: boolean) => {
 		if (grid_vals[key(i, j)] === undefined) {
 			console.warn('Cell raw value was undefined but recieved eval.');
 		} else {
-			grid_vals[key(i, j)].val = val;
+			let cell = grid_vals[key(i, j)];
+			cell.val = val;
+			cell.isErr = isErr;
 		}
 	};
 
-	const setCell = (row: number, col: number, v: string | undefined) => {
+	const setCell = (row: number, col: number, v: CellT | undefined) => {
 		// ignore “no value” so we don’t create keys on mount
-		if (v == null || v === '') delete grid_vals[key(row, col)];
+		if (v?.raw_val == null || v.raw_val === '') delete grid_vals[key(row, col)];
 		else {
-			setCellRaw(row, col, v);
+			setCellRaw(row, col, v.raw_val);
 
 			let msg: LeadMsg = {
 				msg_type: 'set',
 				cell: { row, col },
-				raw: v
+				raw: v.raw_val
 			};
 
 			socket.send(JSON.stringify(msg));
@@ -237,8 +240,7 @@
 					onmousedown={(e) => {
 						handleCellInteraction(i, j, e);
 					}}
-					bind:raw_val={() => getCellRaw(i, j), (v) => setCell(i, j, v)}
-					val={getCellVal(i, j)}
+					bind:cell={() => getCell(i, j), (v) => setCell(i, j, v)}
 					active={active_cell !== null && active_cell[0] === i && active_cell[1] === j}
 				/>
 			{/each}

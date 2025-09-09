@@ -1,4 +1,5 @@
 mod cell;
+mod common;
 mod evaluator;
 mod grid;
 mod messages;

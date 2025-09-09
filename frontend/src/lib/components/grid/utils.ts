@@ -1,6 +1,7 @@
 export interface CellT {
 	raw_val: string;
 	val: LiteralValue | undefined;
+	isErr: boolean;
 }
 
 /**
@@ -47,6 +48,12 @@ export function getEvalLiteral(value: Eval): LiteralValue {
 	if (value === 'unset') return '';
 	if ('literal' in value) return value.literal.value;
 	if ('cellref' in value) return getEvalLiteral(value.cellref.eval);
+	if ('err' in value) return `err: ${value.err.code}`;
 	// if ('range' in value) return 'err';
 	return 'todo!';
+}
+
+export function isErr(value: Eval): boolean {
+	if (value === 'unset') return false;
+	return 'err' in value;
 }

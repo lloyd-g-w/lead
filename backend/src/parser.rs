@@ -1,6 +1,10 @@
 use log::info;
 
-use crate::{cell::CellRef, tokenizer::*};
+use crate::{
+    cell::CellRef,
+    common::{LeadErr, LeadErrCode, Literal},
+    tokenizer::*,
+};
 use std::{collections::HashSet, fmt};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -159,7 +163,7 @@ impl Expr {
     }
 }
 
-pub fn parse(input: &str) -> Result<(Expr, HashSet<CellRef>), String> {
+pub fn parse(input: &str) -> Result<(Expr, HashSet<CellRef>), LeadErr> {
     let mut tokenizer = Tokenizer::new(input)?;
     let mut precs = HashSet::new();
     let expr = _parse(&mut tokenizer, 0, &mut precs)?;
@@ -171,13 +175,17 @@ pub fn _parse(
     input: &mut Tokenizer,
     min_prec: u8,
     precedents: &mut HashSet<CellRef>,
-) -> Result<Expr, String> {
+) -> Result<Expr, LeadErr> {
     let mut lhs = match input.next() {
         Token::Literal(it) => Expr::Literal(it),
         Token::OpenParen => {
             let lhs = _parse(input, 0, precedents)?;
             if input.next() != Token::CloseParen {
-                return Err(format!("Parse error: expected closing paren."));
+                return Err(LeadErr {
+                    title: "Parse error.".into(),
+                    desc: "Expected closing paren.".into(),
+                    code: LeadErrCode::Syntax,
+                });
             }
             Expr::Group(Box::new(lhs))
         }
@@ -186,7 +194,13 @@ pub fn _parse(
                 '+' => PrefixOp::POS,
                 '-' => PrefixOp::NEG,
                 '!' => PrefixOp::NOT,
-                it => return Err(format!("Parse error: unknown prefix operator {:?}.", it)),
+                it => {
+                    return Err(LeadErr {
+                        title: "Parse error.".into(),
+                        desc: format!("Unknown prefix operator {:?}.", it),
+                        code: LeadErrCode::Syntax,
+                    });
+                }
             };
 
             let rhs = _parse(input, prefix_op.prec().1, precedents)?;
@@ -208,10 +222,13 @@ pub fn _parse(
                         input.next();
                         break;
                     } else if nxt != Token::Comma && args.len() != 0 {
-                        return Err(format!(
-                            "Parse error: expected comma while parsing argument of function {:?}.",
-                            id
-                        ));
+                        return Err(LeadErr {
+                            title: "Parse error.".into(),
+                            desc: format!(
+                                "Expected comma while parsing argument of function {id:?}"
+                            ),
+                            code: LeadErrCode::Syntax,
+                        });
                     }
 
                     if args.len() != 0 {
@@ -234,7 +251,13 @@ pub fn _parse(
             }
         },
 
-        it => return Err(format!("Parse error: did not expect token {:?}.", it)),
+        it => {
+            return Err(LeadErr {
+                title: "Parse error.".into(),
+                desc: format!("Unexpected token {:?}.", it),
+                code: LeadErrCode::Syntax,
+            });
+        }
     };
 
     // In the reference article this is a loop with match
@@ -250,7 +273,11 @@ pub fn _parse(
                 '|' => InfixOp::OR,
                 ':' => InfixOp::RANGE,
                 it => {
-                    return Err(format!("Parse error: do not know infix operator {:?}.", it));
+                    return Err(LeadErr {
+                        title: "Parse error.".into(),
+                        desc: format!("Unknown infix operator {:?}.", it),
+                        code: LeadErrCode::Syntax,
+                    });
                 }
             };
 
@@ -270,10 +297,11 @@ pub fn _parse(
             let postfix_op = match op {
                 '%' => PostfixOp::PERCENT,
                 it => {
-                    return Err(format!(
-                        "Parse error: do not know postfix operator {:?}.",
-                        it
-                    ));
+                    return Err(LeadErr {
+                        title: "Parse error.".into(),
+                        desc: format!("Unknown postfix operator {:?}.", it),
+                        code: LeadErrCode::Syntax,
+                    });
                 }
             };
 
