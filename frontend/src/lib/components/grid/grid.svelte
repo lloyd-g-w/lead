@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
+	import { Pencil } from '@lucide/svelte';
 	import Cell from '$lib/components/grid/cell.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
-	import { colToStr, getEvalLiteral, isErr, refToStr, type CellT } from './utils';
+	import { colToStr, refToStr, type CellT } from './utils';
 	import clsx from 'clsx';
+	import { Input } from '../ui/input';
 
 	let {
 		socket,
@@ -44,7 +46,12 @@
 					console.error('Expected cell value for SET msgponse from server.');
 					return;
 				}
-				setCellVal(msg.cell.row, msg.cell.col, getEvalLiteral(msg.eval), isErr(msg.eval));
+
+				grid_vals[key(msg.cell.row, msg.cell.col)] = {
+					raw_val: msg.raw ?? '',
+					val: msg.eval
+				};
+
 				break;
 			}
 			case 'bulk': {
@@ -108,44 +115,24 @@
 	const key = (i: number, j: number) => `${i}:${j}`;
 
 	const getCell = (i: number, j: number) => grid_vals[key(i, j)];
-
-	const getCellRaw = (i: number, j: number) => getCell(i, j)?.raw_val ?? '';
-	const setCellRaw = (i: number, j: number, val: string) => {
-		if (grid_vals[key(i, j)] === undefined) {
-			grid_vals[key(i, j)] = {
-				raw_val: val,
-				isErr: false,
-				val: undefined
-			};
-		} else {
-			grid_vals[key(i, j)].raw_val = val;
+	const setCell = (row: number, col: number, v: CellT) => {
+		if (v?.raw_val == null || v.raw_val === '') {
+			delete grid_vals[key(row, col)];
+			return;
 		}
-	};
-	const getCellVal = (i: number, j: number) => getCell(i, j);
-	const setCellVal = (i: number, j: number, val: LiteralValue, isErr: boolean) => {
-		if (grid_vals[key(i, j)] === undefined) {
-			console.warn('Cell raw value was undefined but recieved eval.');
-		} else {
-			let cell = grid_vals[key(i, j)];
-			cell.val = val;
-			cell.isErr = isErr;
-		}
-	};
 
-	const setCell = (row: number, col: number, v: CellT | undefined) => {
-		// ignore “no value” so we don’t create keys on mount
-		if (v?.raw_val == null || v.raw_val === '') delete grid_vals[key(row, col)];
-		else {
-			setCellRaw(row, col, v.raw_val);
+		grid_vals[key(row, col)] = {
+			raw_val: v.raw_val,
+			val: v.val
+		};
 
-			let msg: LeadMsg = {
-				msg_type: 'set',
-				cell: { row, col },
-				raw: v.raw_val
-			};
+		let msg: LeadMsg = {
+			msg_type: 'set',
+			cell: { row, col },
+			raw: v.raw_val
+		};
 
-			socket.send(JSON.stringify(msg));
-		}
+		socket.send(JSON.stringify(msg));
 	};
 
 	function handleCellInteraction(i: number, j: number, e: MouseEvent) {
@@ -180,6 +167,33 @@
 		active_cell = [i, j];
 	}
 
+	function getActiveCell(): CellT {
+		if (active_cell != null && grid_vals[key(active_cell[0], active_cell[1])])
+			return grid_vals[key(active_cell[0], active_cell[1])];
+		else
+			return {
+				raw_val: '',
+				val: undefined
+			};
+	}
+
+	function setActiveCellRaw(raw: string): void {
+		if (active_cell == null) return;
+
+		if (grid_vals[key(active_cell[0], active_cell[1])]) {
+			let cell = grid_vals[key(active_cell[0], active_cell[1])];
+			setCell(active_cell[0], active_cell[1], {
+				raw_val: raw,
+				val: cell.val
+			});
+		} else {
+			setCell(active_cell[0], active_cell[1], {
+				raw_val: raw,
+				val: undefined
+			});
+		}
+	}
+
 	onMount(() => {
 		const handler = (e: MouseEvent) => {
 			// optional: check if click target is outside grid container
@@ -191,6 +205,15 @@
 		onDestroy(() => window.removeEventListener('click', handler));
 	});
 </script>
+
+<div class="mb-5 ml-5 flex items-center gap-5">
+	<Pencil />
+	<Input
+		bind:value={() => getActiveCell().raw_val, (raw) => setActiveCellRaw(raw)}
+		class="relative w-[200px] rounded-none p-1 !transition-none delay-0 duration-0
+			focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
+	></Input>
+</div>
 
 <div
 	class={clsx('grid-wrapper relative h-full min-h-0 max-w-full min-w-0 overflow-auto', className)}

@@ -7,6 +7,7 @@ use crate::common::Literal;
 use crate::grid::Grid;
 use crate::parser::*;
 use std::collections::HashSet;
+use std::f64;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -117,6 +118,15 @@ fn evaluate_expr(
         Expr::Group(g) => evaluate_expr(g, precs, grid)?,
         Expr::Function { name, args } => match name.as_str() {
             "AVG" => eval_avg(args, precs, grid)?,
+            "EXP" => eval_single_arg_numeric(args, precs, grid, |x| x.exp(), "EXP".into())?,
+            "SIN" => eval_single_arg_numeric(args, precs, grid, |x| x.sin(), "SIN".into())?,
+            "COS" => eval_single_arg_numeric(args, precs, grid, |x| x.cos(), "COS".into())?,
+            "TAN" => eval_single_arg_numeric(args, precs, grid, |x| x.tan(), "TAN".into())?,
+            "ASIN" => eval_single_arg_numeric(args, precs, grid, |x| x.asin(), "ASIN".into())?,
+            "ACOS" => eval_single_arg_numeric(args, precs, grid, |x| x.acos(), "ACOS".into())?,
+            "ATAN" => eval_single_arg_numeric(args, precs, grid, |x| x.atan(), "ATAN".into())?,
+            "PI" => eval_const(args, Eval::Literal(Literal::Number(f64::consts::PI)))?,
+            "TAU" => eval_const(args, Eval::Literal(Literal::Number(f64::consts::TAU)))?,
             it => {
                 return Err(LeadErr {
                     title: "Evaluation error.".into(),
@@ -254,6 +264,49 @@ fn eval_avg(
     } else {
         Ok(Eval::Literal(Literal::Number(res / count as f64)))
     }
+}
+
+fn eval_single_arg_numeric(
+    args: &Vec<Expr>,
+    precs: &mut HashSet<CellRef>,
+    grid: Option<&Grid>,
+    func: fn(f64) -> f64,
+    func_name: String,
+) -> Result<Eval, LeadErr> {
+    if args.len() != 1 {
+        return Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: format!("{func_name} function requires a single argument."),
+            code: LeadErrCode::Invalid,
+        });
+    }
+
+    let err = LeadErr {
+        title: "Evaluation error.".into(),
+        desc: format!("{func_name} function requires a numeric argument."),
+        code: LeadErrCode::TypeErr,
+    };
+
+    match evaluate_expr(&args[0], precs, grid)? {
+        Eval::Literal(Literal::Number(num)) => Ok(Eval::Literal(Literal::Number(func(num)))),
+        Eval::CellRef { eval, .. } => match *eval {
+            Eval::Literal(Literal::Number(n)) => Ok(Eval::Literal(Literal::Number(func(n)))),
+            _ => Err(err),
+        },
+        _ => Err(err),
+    }
+}
+
+fn eval_const(args: &Vec<Expr>, value: Eval) -> Result<Eval, LeadErr> {
+    if args.len() != 0 {
+        return Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: format!("PI function requires no arguments."),
+            code: LeadErrCode::Invalid,
+        });
+    }
+
+    Ok(value)
 }
 
 fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {

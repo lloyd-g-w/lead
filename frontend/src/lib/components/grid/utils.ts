@@ -1,7 +1,6 @@
 export interface CellT {
 	raw_val: string;
-	val: LiteralValue | undefined;
-	isErr: boolean;
+	val?: Eval;
 }
 
 /**
@@ -44,16 +43,38 @@ export function refToStr(row: number, col: number): string {
 	return colToStr(col) + (row + 1).toString();
 }
 
-export function getEvalLiteral(value: Eval): LiteralValue {
+export function getEvalLiteral(value: Eval | undefined): LiteralValue {
+	if (value === undefined) return '';
 	if (value === 'unset') return '';
-	if ('literal' in value) return value.literal.value;
+	if ('literal' in value) {
+		if (value.literal.value == null) return 'NaN';
+		return value.literal.value;
+	}
 	if ('cellref' in value) return getEvalLiteral(value.cellref.eval);
-	if ('err' in value) return `err: ${value.err.code}`;
+	if ('err' in value) return `#${value.err.code.toUpperCase()}`;
 	// if ('range' in value) return 'err';
 	return 'todo!';
 }
 
-export function isErr(value: Eval): boolean {
+export function isErr(value: Eval | undefined): boolean {
+	if (value === undefined) return false;
 	if (value === 'unset') return false;
+	if ('cellref' in value) return isErr(value.cellref.eval);
 	return 'err' in value;
+}
+
+export function getErrTitle(value: Eval | undefined): string {
+	if (value === undefined) return '';
+	if (value === 'unset') return '';
+	if ('cellref' in value) return getErrTitle(value.cellref.eval);
+	if (!('err' in value)) return '';
+	return value.err.title;
+}
+
+export function getErrDesc(value: Eval | undefined): string {
+	if (value === undefined) return '';
+	if (value === 'unset') return '';
+	if ('cellref' in value) return getErrDesc(value.cellref.eval);
+	if (!('err' in value)) return '';
+	return value.err.desc;
 }

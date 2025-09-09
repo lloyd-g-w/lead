@@ -19,6 +19,7 @@ pub enum LeadErrCode {
     Syntax,
     Server,
     Unsupported,
+    Invalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{cell::CellRef, evaluator::Eval};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum MsgType {
     Set,
@@ -11,7 +11,7 @@ pub enum MsgType {
     Bulk,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LeadMsg {
     pub msg_type: MsgType,
     pub cell: Option<CellRef>,

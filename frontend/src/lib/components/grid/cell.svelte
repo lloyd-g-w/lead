@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
 	import clsx from 'clsx';
-	import type { CellT } from './utils';
+	import { getErrDesc, getErrTitle, getEvalLiteral, isErr, type CellT } from './utils';
+	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
 
 	let {
 		cla = '',
@@ -56,15 +57,30 @@
 			focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
 			onblur={(e) => {
 				cell = {
-					isErr: false,
-					val: undefined,
+					val: cell?.val,
 					raw_val: (e.target as HTMLInputElement).value
 				};
 				stopediting();
 			}}
 		/>
 	</div>
+{:else if cell && isErr(cell.val)}
+	<HoverCard.Root openDelay={500} closeDelay={500}>
+		<HoverCard.Trigger>
+			{@render InnerCell()}
+		</HoverCard.Trigger>
+		<HoverCard.Content side="right">
+			<h2 class="text-md font-semibold tracking-tight transition-colors">
+				{getErrTitle(cell.val)}
+			</h2>
+			{getErrDesc(cell.val)}
+		</HoverCard.Content>
+	</HoverCard.Root>
 {:else}
+	{@render InnerCell()}
+{/if}
+
+{#snippet InnerCell()}
 	<div
 		ondblclick={startediting}
 		{onmousedown}
@@ -72,17 +88,17 @@
 		style:height
 		class={clsx('placeholder bg-background p-1', { active }, cla)}
 	>
-		{#if cell && (cell.raw_val !== '' || cell.val !== '')}
-			<span class={clsx('pointer-events-none select-none', { err: cell.isErr })}>
+		{#if cell && (cell.raw_val !== '' || getEvalLiteral(cell.val) !== '')}
+			<span class={clsx('pointer-events-none select-none', { err: isErr(cell.val) })}>
 				{#if cell.val}
-					{cell.val}
+					{getEvalLiteral(cell.val)}
 				{:else}
 					{cell.raw_val}
 				{/if}
 			</span>
 		{/if}
 	</div>
-{/if}
+{/snippet}
 
 <style>
 	.placeholder {
@@ -101,6 +117,7 @@
 	.active:has(.err),
 	.placeholder:has(.err) {
 		position: relative; /* needed for absolute positioning */
+		color: red;
 	}
 
 	.active:has(.err)::after,

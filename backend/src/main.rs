@@ -79,17 +79,23 @@ async fn accept_connection(stream: TcpStream) {
                                     }
                                 }
 
-                                let msg = LeadMsg {
-                                    cell: None,
-                                    raw: None,
-                                    eval: None,
-                                    bulk_msgs: Some(msgs),
-                                    msg_type: MsgType::Bulk,
-                                };
+                                if msgs.len() == 1 {
+                                    let _ = write
+                                        .send(serde_json::to_string(&msgs.get(0)).unwrap().into())
+                                        .await;
+                                } else if msgs.len() > 1 {
+                                    let msg = LeadMsg {
+                                        cell: None,
+                                        raw: None,
+                                        eval: None,
+                                        bulk_msgs: Some(msgs),
+                                        msg_type: MsgType::Bulk,
+                                    };
 
-                                let _ = write
-                                    .send(serde_json::to_string(&msg).unwrap().into())
-                                    .await;
+                                    let _ = write
+                                        .send(serde_json::to_string(&msg).unwrap().into())
+                                        .await;
+                                }
                             }
                             Err(e) => {
                                 let res = LeadMsg {
