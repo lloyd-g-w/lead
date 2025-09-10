@@ -6,8 +6,8 @@
 	import { colToStr, refToStr } from './utils';
 	import clsx from 'clsx';
 	import { Input } from '../ui/input';
-	import { Grid, Position } from './grid';
 	import type { LeadMsg } from './messages';
+	import { grid, Position } from './grid.svelte.ts';
 
 	let {
 		socket,
@@ -34,38 +34,35 @@
 	let rows = 50;
 	let cols = 40;
 
-	let grid = $state(new Grid(socket));
-
 	function handleCellInteraction(i: number, j: number, e: MouseEvent) {
 		let pos = new Position(i, j);
-		console.log('clicked', pos);
-		//
-		// if (grid.isEditing(pos)) {
-		// 	// Get the actual input element that's being edited
-		// 	const el = document.querySelector<HTMLInputElement>('input:focus');
-		// 	const currentInputValue = el?.value ?? '';
-		//
-		// 	// ONLY treat this as a reference insert if it's a formula
-		// 	if (currentInputValue.trim().startsWith('=')) {
-		// 		// Prevent the input from losing focus
-		// 		e.preventDefault();
-		//
-		// 		// --- This is the same reference-inserting logic as before ---
-		// 		const ref = refToStr(i, j);
-		// 		if (el) {
-		// 			const { selectionStart, selectionEnd } = el;
-		// 			const before = el.value.slice(0, selectionStart ?? 0);
-		// 			const after = el.value.slice(selectionEnd ?? 0);
-		// 			el.value = before + ref + after;
-		// 			const newPos = (selectionStart ?? 0) + ref.length;
-		// 			el.setSelectionRange(newPos, newPos);
-		// 			el.dispatchEvent(new Event('input', { bubbles: true }));
-		// 			el.focus();
-		// 		}
-		//
-		// 		return;
-		// 	}
-		// }
+
+		if (grid.isEditing(pos)) {
+			// Get the actual input element that's being edited
+			const el = document.querySelector<HTMLInputElement>('input:focus');
+			const currentInputValue = el?.value ?? '';
+
+			// ONLY treat this as a reference insert if it's a formula
+			if (currentInputValue.trim().startsWith('=')) {
+				// Prevent the input from losing focus
+				e.preventDefault();
+
+				// --- This is the same reference-inserting logic as before ---
+				const ref = refToStr(i, j);
+				if (el) {
+					const { selectionStart, selectionEnd } = el;
+					const before = el.value.slice(0, selectionStart ?? 0);
+					const after = el.value.slice(selectionEnd ?? 0);
+					el.value = before + ref + after;
+					const newPos = (selectionStart ?? 0) + ref.length;
+					el.setSelectionRange(newPos, newPos);
+					el.dispatchEvent(new Event('input', { bubbles: true }));
+					el.focus();
+				}
+
+				return;
+			}
+		}
 
 		// We are not editing, so this is a normal cell selection OR this is not a formula
 		grid.setActive(pos);
@@ -108,7 +105,7 @@
 			onmousedown={() => grid.setExternalEdit(grid.getActivePos())}
 			onblur={() => grid.setExternalEdit(null)}
 			bind:value={
-				() => grid.getActiveCell().raw_val, (raw) => grid.quickEval(grid.getActivePos(), raw)
+				() => grid.getActiveCell()?.raw_val ?? '', (raw) => grid.quickEval(grid.getActivePos(), raw)
 			}
 			class="relative w-[200px] pl-9"
 		></Input>
@@ -167,10 +164,7 @@
 					bind:cell={
 						() => grid.getCell(new Position(i, j)), (v) => grid.setCell(new Position(i, j), v)
 					}
-					active={(() => {
-						console.log(grid.isActive(new Position(i, j)));
-						return grid.isActive(new Position(i, j));
-					})()}
+					active={grid.isActive(new Position(i, j))}
 				/>
 			{/each}
 		</div>

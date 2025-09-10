@@ -32,15 +32,16 @@ class Position {
 }
 
 class Grid {
-	data: Record<string, CellT> = {};
+	data: Record<string, CellT> = $state({});
 	socket: WebSocket;
-	row_heights: Record<number, string> = {};
-	col_widths: Record<number, string> = {};
+	row_heights: Record<number, string> = $state({});
+	col_widths: Record<number, string> = $state({});
 	default_row_height: string;
 	default_col_width: string;
-	active_cell: Position | null = null;
-	editing_cell: Position | null = null;
-	external_editing_cell: Position | null = null;
+	active_cell: Position | null = $state(null);
+	editing_cell: Position | null = $state(null);
+	external_editing_cell: Position | null = $state(null);
+	editing_preview = $state(null);
 
 	constructor(socket: WebSocket, default_col_width = '80px', default_row_height = '30px') {
 		this.socket = socket;
@@ -59,7 +60,7 @@ class Grid {
 		}
 
 		this.data[pos.key()] = {
-			raw_val: v.raw_val,
+			raw_val: v?.raw_val,
 			val: v.val
 		};
 
@@ -138,13 +139,15 @@ class Grid {
 	}
 
 	public getActiveCell(): CellT {
-		if (this.active_cell === null) return {
-			raw_val: '',
-			val: undefined
-		};
+		if (this.active_cell === null)
+			return {
+				raw_val: '',
+				val: undefined
+			};
 
 		return this.getCell(this.active_cell);
 	}
+
 	public getActivePos(): Position | null {
 		return this.active_cell;
 	}
@@ -205,4 +208,7 @@ class Grid {
 	}
 }
 
-export { Grid, Position };
+export {  Position };
+
+
+export const grid = new Grid(new WebSocket(''));
