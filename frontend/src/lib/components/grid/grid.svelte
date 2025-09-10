@@ -32,8 +32,8 @@
 	};
 
 	const grid = new Grid(socket);
-	let rows = 100;
-	let cols = 40;
+	let rows = 10;
+	let cols = 10;
 
 	function handleCellInteraction(i: number, j: number, e: MouseEvent) {
 		let pos = new Position(i, j);
@@ -104,9 +104,12 @@
 		/>
 		<Input
 			onmousedown={() => grid.setExternalEdit(grid.getActivePos())}
-			onblur={() => grid.setExternalEdit(null)}
+			onblur={() => grid.setCell(grid.getActivePos())}
 			bind:value={
-				() => grid.getActiveCell()?.raw_val ?? '', (raw) => grid.quickEval(grid.getActivePos(), raw)
+				() => grid.getActiveCell()?.temp_raw ?? '',
+				(v) => {
+					grid.setCellTemp(grid.getActivePos(), v);
+				}
 			}
 			class="relative w-[200px] pl-9"
 		></Input>
@@ -114,7 +117,10 @@
 </div>
 
 <div
-	class={clsx('grid-wrapper relative h-full min-h-0 max-w-full min-w-0 overflow-auto', className)}
+	class={clsx(
+		' grid-wrapper relative h-full min-h-0 max-w-full min-w-0 overflow-auto overflow-visible',
+		className
+	)}
 >
 	<div class="sticky top-0 flex w-fit" style="z-index: {rows + 70}">
 		<div class="sticky top-0 left-0" style="z-index: {rows + 70}">
@@ -163,7 +169,8 @@
 						handleCellInteraction(i, j, e);
 					}}
 					bind:cell={
-						() => grid.getCell(new Position(i, j)), (v) => grid.setCell(new Position(i, j), v)
+						() => grid.getCell(new Position(i, j)),
+						(v) => grid.setCellTemp(new Position(i, j), v?.temp_raw)
 					}
 					active={grid.isActive(new Position(i, j))}
 				/>

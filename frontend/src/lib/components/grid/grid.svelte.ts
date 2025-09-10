@@ -1,5 +1,5 @@
 import { toast } from 'svelte-sonner';
-import type { CellRef, CellT, LeadMsg } from './messages';
+import type { CellRef, CellT, Eval, LeadMsg } from './messages';
 
 class Position {
 	public row: number;
@@ -41,7 +41,7 @@ class Grid {
 	active_cell: Position | null = $state(null);
 	editing_cell: Position | null = $state(null);
 	external_editing_cell: Position | null = $state(null);
-	editing_preview = $state(null);
+	editing_preview: [Eval, boolean] | null = $state(null); // [Eval, dirty]
 
 	constructor(socket: WebSocket, default_col_width = '80px', default_row_height = '30px') {
 		this.socket = socket;
@@ -49,28 +49,45 @@ class Grid {
 		this.default_row_height = default_row_height;
 	}
 
-	public getCell(pos: Position): CellT {
+	public getCell(pos: Position): CellT | undefined {
 		return this.data[pos.key()];
 	}
 
-	public setCell(pos: Position, v: CellT) {
-		if (v?.raw_val == null || v.raw_val === '') {
+	public setCell(pos: Position | null) {
+		if (pos === null) return;
+		let data = this.data[pos.key()];
+		if (data === undefined) return;
+
+		if (data.temp_raw === '') {
 			delete this.data[pos.key()];
 			return;
 		}
 
-		this.data[pos.key()] = {
-			raw_val: v?.raw_val,
-			val: v.val
-		};
+		data.raw = data.temp_raw;
+		data.eval = data.temp_eval;
 
 		let msg: LeadMsg = {
 			msg_type: 'set',
 			cell: pos.ref(),
-			raw: v.raw_val
+			raw: data.temp_raw
 		};
 
 		this.socket.send(JSON.stringify(msg));
+	}
+
+	public setCellTemp(pos: Position | null, raw: string | undefined) {
+		if (pos === null || raw === undefined) return;
+
+		let x = this.data[pos.key()];
+
+		this.data[pos.key()] = {
+			raw: x?.raw ?? '',
+			temp_raw: raw,
+			eval: x?.eval ?? undefined,
+			temp_eval: x?.temp_eval ?? undefined
+		};
+
+		this.quickEval(pos, raw);
 	}
 
 	public getRowHeight(row: number) {
@@ -107,16 +124,19 @@ class Grid {
 	public startEditing(pos: Position) {
 		this.active_cell = pos;
 		this.editing_cell = pos;
+
+		let cell = this.getCell(pos);
+		if (!cell) return;
+		cell.temp_eval = undefined;
 	}
 
 	public stopEditing(pos: Position) {
 		this.editing_cell = null;
-		this.setCell(pos, this.getCell(pos));
+		this.setCell(pos);
 	}
 
 	public stopEditingActive() {
 		if (this.active_cell == null) return;
-
 		this.stopEditing(this.active_cell);
 	}
 
@@ -138,11 +158,12 @@ class Grid {
 		this.external_editing_cell = pos;
 	}
 
-	public getActiveCell(): CellT {
+	public getActiveCell(): CellT | undefined {
 		if (this.active_cell === null)
 			return {
-				raw_val: '',
-				val: undefined
+				raw: '',
+				temp_raw: '',
+				eval: undefined
 			};
 
 		return this.getCell(this.active_cell);
@@ -179,16 +200,22 @@ class Grid {
 			}
 			case 'set': {
 				if (msg.cell === undefined) {
-					console.error('Expected cell ref for SET msgponse from server.');
+					console.error('Expected cell ref for SET msg from server.');
 					return;
 				} else if (msg.eval === undefined) {
-					console.error('Expected cell value for SET msgponse from server.');
+					console.error('Expected cell value for SET msg from server.');
 					return;
 				}
 
-				this.data[Position.key(msg.cell.row, msg.cell.col)] = {
-					raw_val: msg.raw ?? '',
-					val: msg.eval
+				let pos = new Position(msg.cell.row, msg.cell.col);
+
+				let x = this.data[pos.key()];
+
+				this.data[pos.key()] = {
+					raw: msg.raw ?? '',
+					eval: msg.eval,
+					temp_raw: x?.temp_raw ?? '',
+					temp_eval: x?.temp_eval ?? undefined
 				};
 
 				break;
@@ -200,9 +227,23 @@ class Grid {
 				}
 
 				for (const m of msg.bulk_msgs) this.handle_msg(m);
+				break;
 			}
 			case 'eval': {
-				// TODO
+				if (msg.cell === undefined) {
+					console.error('Expected cell ref for EVAL msg from server.');
+					return;
+				} else if (msg.eval === undefined) {
+					console.error('Expected cell value for EVAL msg from server.');
+					return;
+				}
+
+				let pos = new Position(msg.cell.row, msg.cell.col);
+				if (this.data[pos.key()] === undefined) return;
+
+				this.data[pos.key()].temp_eval = msg.eval;
+
+				break;
 			}
 		}
 	}

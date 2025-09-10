@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
 	import clsx from 'clsx';
-	import { getErrDesc, getErrTitle, getEvalLiteral, isErr, type CellT } from './utils';
+	import { getErrDesc, getErrTitle, getEvalLiteral, isErr } from './utils';
 	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import type { CellT } from './messages';
 
 	let {
 		cla = '',
@@ -33,7 +34,7 @@
 		queueMicrotask(() => {
 			const el = node.querySelector('input') as HTMLInputElement | null;
 			if (el !== null) {
-				el.value = cell?.raw_val ?? '';
+				el.value = cell?.temp_raw ?? '';
 				el.focus();
 			}
 		});
@@ -49,44 +50,48 @@
 			stopediting();
 		}
 	}
+
+	function getPreview() {
+		return !isErr(cell?.temp_eval) ? getEvalLiteral(cell?.temp_eval) : '';
+	}
+
+	let showPreview = $derived(getPreview() !== '');
 </script>
 
 {#if editing}
-	<div use:autofocusWithin onkeydown={handleKeydown}>
-		<Input
-			style="width: {width}; height: {height}"
-			class="relative rounded-none p-1 !transition-none delay-0 duration-0
-			focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
-			bind:value={
-				() => {
-					return cell?.raw_val ?? '';
-				},
-				(v) => {
-					cell = {
-						val: cell?.val,
-						raw_val: v
-					};
+	<div class="relative inline-block">
+		{#if showPreview}
+			<h3
+				class="bubble pointer-events-none absolute -top-[6px] -left-1 z-[500] -translate-y-full text-sm font-semibold tracking-tight text-foreground select-none"
+				role="tooltip"
+			>
+				{getPreview()}
+			</h3>
+		{/if}
+
+		<div use:autofocusWithin onkeydown={handleKeydown}>
+			<Input
+				style="width: {width}; height: {height}"
+				class="relative rounded-none p-1 !transition-none delay-0 duration-0
+        focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
+				bind:value={
+					() => cell?.temp_raw ?? '',
+					(v) => (cell = { eval: cell?.eval, raw: cell?.raw ?? '', temp_raw: v })
 				}
-			}
-			onblur={(e) => {
-				// cell = {
-				// 	val: cell?.val,
-				// 	raw_val: (e.target as HTMLInputElement).value
-				// };
-				stopediting();
-			}}
-		/>
+				onblur={stopediting}
+			/>
+		</div>
 	</div>
-{:else if cell && isErr(cell.val)}
+{:else if cell && isErr(cell.eval)}
 	<HoverCard.Root openDelay={500} closeDelay={500}>
 		<HoverCard.Trigger>
 			{@render InnerCell()}
 		</HoverCard.Trigger>
 		<HoverCard.Content side="right">
 			<h2 class="text-md font-semibold tracking-tight transition-colors">
-				{getErrTitle(cell.val)}
+				{getErrTitle(cell.eval)}
 			</h2>
-			{getErrDesc(cell.val)}
+			{getErrDesc(cell.eval)}
 		</HoverCard.Content>
 	</HoverCard.Root>
 {:else}
@@ -101,12 +106,12 @@
 		style:height
 		class={clsx('placeholder bg-background p-1', { active }, cla)}
 	>
-		{#if cell && (cell.raw_val !== '' || getEvalLiteral(cell.val) !== '')}
-			<span class={clsx('pointer-events-none select-none', { err: isErr(cell.val) })}>
-				{#if cell.val && !externalediting}
-					{getEvalLiteral(cell.val)}
+		{#if cell && (cell.raw !== '' || getEvalLiteral(cell.eval) !== '')}
+			<span class={clsx('pointer-events-none select-none', { err: isErr(cell.eval) })}>
+				{#if cell.eval && !externalediting}
+					{getEvalLiteral(cell.eval)}
 				{:else}
-					{cell.raw_val}
+					{cell.raw}
 				{/if}
 			</span>
 		{/if}
@@ -143,5 +148,38 @@
 		height: 0;
 		border-top: 12px solid red; /* size & color of the triangle */
 		border-left: 12px solid transparent;
+	}
+
+	.bubble {
+		z-index: 500;
+		background: var(--color-popover);
+		border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+		border-radius: 10px;
+		color: var(--color-popover-foreground);
+		padding: 0.35rem 0.6rem;
+		box-shadow: 0 2px 18px rgba(0, 0, 0, 0.08);
+		max-width: min(15rem, 20vw);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		line-height: 1.2;
+	}
+
+	/* (optional) subtle appear animation */
+	@media (prefers-reduced-motion: no-preference) {
+		.bubble {
+			transform-origin: bottom left;
+			animation: bubble-in 120ms ease-out both;
+		}
+		@keyframes bubble-in {
+			from {
+				opacity: 0;
+				transform: translateY(2px) scale(0.98);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0) scale(1);
+			}
+		}
 	}
 </style>

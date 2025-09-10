@@ -45,9 +45,11 @@ type Eval =
 	| { err: LeadErr }
 	| 'unset';
 
- interface CellT {
-	raw_val: string;
-	val?: Eval;
+interface CellT {
+	raw: string;
+	temp_raw: string;
+	temp_eval?: Eval;
+	eval?: Eval;
 }
 
 export type { Eval, LeadMsg, LeadErr, Literal, CellRef, LiteralValue, CellT };
