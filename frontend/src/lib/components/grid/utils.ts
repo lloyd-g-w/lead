@@ -1,7 +1,4 @@
-export interface CellT {
-	raw_val: string;
-	val?: Eval;
-}
+import type { CellRef, Eval, LiteralValue } from './messages';
 
 /**
  * Zero indexed | A1 == {row: 0, col: 0};

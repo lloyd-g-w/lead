@@ -102,10 +102,10 @@
 		border-left: none;
 	}
 
-	.placeholder.blank,
-	.placeholder.col {
-		border-top: none;
-	}
+	/* .placeholder.blank, */
+	/* .placeholder.col { */
+	/* 	border-top: none; */
+	/* } */
 
 	.active {
 		background-color: color-mix(in oklab, var(--color-primary) 80%, var(--color-background) 80%);

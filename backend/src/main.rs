@@ -62,16 +62,9 @@ async fn accept_connection(stream: TcpStream) {
                     MsgType::Set => {
                         let Some(cell_ref) = req.cell else { continue };
                         let Some(raw) = req.raw else { continue };
-                        let Some(config) = req.eval_config else {
-                            continue;
-                        };
+                        // let config = req.eval_config.unwrap_or_default();
 
-                        match grid.update_cell(
-                            cell_ref.clone(),
-                            raw.to_owned(),
-                            config.do_propagation,
-                            config.force_propagation,
-                        ) {
+                        match grid.update_cell(cell_ref.clone(), raw.to_owned()) {
                             Ok(updates) => {
                                 let mut msgs = Vec::new();
 
@@ -121,6 +114,25 @@ async fn accept_connection(stream: TcpStream) {
                                     .await;
                             }
                         }
+                    }
+                    MsgType::Eval => {
+                        let Some(cell_ref) = req.cell else { continue };
+                        let Some(raw) = req.raw else { continue };
+
+                        let eval = grid.quick_eval(raw.to_owned());
+
+                        let msg = LeadMsg {
+                            msg_type: MsgType::Eval,
+                            cell: Some(cell_ref),
+                            raw: Some(raw),
+                            eval: Some(eval),
+                            bulk_msgs: None,
+                            eval_config: None,
+                        };
+
+                        let _ = write
+                            .send(serde_json::to_string(&msg).unwrap().into())
+                            .await;
                     }
                     _ => {
                         continue; // handle other cases

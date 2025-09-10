@@ -6,6 +6,7 @@ use crate::{cell::CellRef, evaluator::Eval};
 #[serde(rename_all = "lowercase")]
 pub enum MsgType {
     Set,
+    Eval,
     Get,
     Error,
     Bulk,
@@ -15,6 +16,15 @@ pub enum MsgType {
 pub struct EvalConfig {
     pub do_propagation: bool,
     pub force_propagation: bool,
+}
+
+impl Default for EvalConfig {
+    fn default() -> Self {
+        EvalConfig {
+            do_propagation: true,
+            force_propagation: false,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

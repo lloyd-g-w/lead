@@ -1,5 +1,5 @@
 interface LeadMsg {
-	msg_type: 'set' | 'get' | 'error' | 'bulk';
+	msg_type: 'set' | 'get' | 'error' | 'bulk' | 'eval';
 	cell?: CellRef;
 	raw?: string;
 	eval?: Eval;
@@ -44,3 +44,10 @@ type Eval =
 	| { range: Range }
 	| { err: LeadErr }
 	| 'unset';
+
+ interface CellT {
+	raw_val: string;
+	val?: Eval;
+}
+
+export type { Eval, LeadMsg, LeadErr, Literal, CellRef, LiteralValue, CellT };

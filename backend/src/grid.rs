@@ -23,13 +23,8 @@ impl Grid {
         &mut self,
         cell_ref: CellRef,
         raw_val: String,
-        do_propagation: bool,
-        force_propagation: bool,
     ) -> Result<Vec<CellRef>, String> {
-        if self.cells.contains_key(&cell_ref)
-            && self.cells[&cell_ref].raw() == raw_val
-            && !force_propagation
-        {
+        if self.cells.contains_key(&cell_ref) && self.cells[&cell_ref].raw() == raw_val {
             return Ok(Vec::new());
         }
 
@@ -48,14 +43,7 @@ impl Grid {
 
         if self.cells.contains_key(&cell_ref) {
             updated_cells = self
-                .update_exisiting_cell(
-                    raw_val,
-                    eval,
-                    precs,
-                    cell_ref,
-                    do_propagation,
-                    force_propagation,
-                )?
+                .update_exisiting_cell(raw_val, eval, precs, cell_ref)?
                 .into_iter()
                 .chain(updated_cells)
                 .collect();
@@ -64,6 +52,15 @@ impl Grid {
         }
 
         Ok(updated_cells)
+    }
+
+    pub fn quick_eval(&mut self, raw_val: String) -> Eval {
+        if raw_val.chars().nth(0) != Some('=') {
+            Eval::Literal(Literal::String(raw_val.to_owned()))
+        } else {
+            let (res_eval, ..) = evaluate(raw_val[1..].to_owned(), Some(&self));
+            res_eval
+        }
     }
 
     pub fn get_cell(&self, cell_ref: CellRef) -> Result<Cell, String> {
@@ -168,8 +165,6 @@ impl Grid {
         new_eval: Eval,
         new_precs: HashSet<CellRef>,
         cell_ref: CellRef,
-        do_propagation: bool,
-        force_propagation: bool,
     ) -> Result<Vec<CellRef>, String> {
         let (old_precs, old_eval) = match self.cells.get_mut(&cell_ref) {
             Some(cell) => {
@@ -211,7 +206,7 @@ impl Grid {
         cell.set_precs(new_precs);
         cell.set_eval(new_eval);
 
-        if (eval_changed && do_propagation) || force_propagation {
+        if eval_changed {
             self.propagate(cell_ref)
         } else {
             Ok(Vec::new())

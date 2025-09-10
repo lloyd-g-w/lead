@@ -1,21 +1,13 @@
 <script lang="ts">
-	import { toast } from 'svelte-sonner';
-	import {
-		Infinity,
-		Omega,
-		Parentheses,
-		Pyramid,
-		Radical,
-		Sigma,
-		SquareFunction,
-		Variable
-	} from '@lucide/svelte';
+	import { Omega } from '@lucide/svelte';
 	import Cell from '$lib/components/grid/cell.svelte';
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
-	import { colToStr, refToStr, type CellT } from './utils';
+	import { colToStr, refToStr } from './utils';
 	import clsx from 'clsx';
 	import { Input } from '../ui/input';
+	import { Grid, Position } from './grid';
+	import type { LeadMsg } from './messages';
 
 	let {
 		socket,
@@ -36,186 +28,47 @@
 			return;
 		}
 
-		handle_msg(res);
+		grid.handle_msg(res);
 	};
-
-	function handle_msg(msg: LeadMsg) {
-		switch (msg.msg_type) {
-			case 'error': {
-				toast.error('Error', {
-					description: msg.raw
-				});
-				break;
-			}
-			case 'set': {
-				if (msg.cell === undefined) {
-					console.error('Expected cell ref for SET msgponse from server.');
-					return;
-				} else if (msg.eval === undefined) {
-					console.error('Expected cell value for SET msgponse from server.');
-					return;
-				}
-
-				grid_vals[key(msg.cell.row, msg.cell.col)] = {
-					raw_val: msg.raw ?? '',
-					val: msg.eval
-				};
-
-				break;
-			}
-			case 'bulk': {
-				if (msg.bulk_msgs === undefined) {
-					console.error('Expected bulk_msgs field to be defined for BULK message.');
-					return;
-				}
-
-				for (const m of msg.bulk_msgs) handle_msg(m);
-			}
-		}
-	}
 
 	let rows = 50;
 	let cols = 40;
 
-	let default_row_height = '30px';
-	let default_col_width = '80px';
-
-	// Only store touched cells
-	let grid_vals: Record<string, CellT> = $state({});
-	let row_heights: Record<number, string> = $state({});
-	let col_widths: Record<number, string> = $state({});
-
-	function getRowHeight(row: number) {
-		return row_heights[row] ?? default_row_height;
-	}
-
-	function getColWidth(col: number) {
-		return col_widths[col] ?? default_col_width;
-	}
-
-	function setRowHeight(row: number, height: string) {
-		if (height === default_row_height) {
-			delete row_heights[row];
-		} else {
-			row_heights[row] = height;
-		}
-	}
-
-	function setColWidth(col: number, width: string) {
-		if (width === default_col_width) {
-			delete col_widths[col];
-		} else {
-			col_widths[col] = width;
-		}
-	}
-
-	let active_cell: [number, number] | null = $state(null);
-	let editing_cell: [number, number] | null = $state(null);
-
-	function startEditing(i: number, j: number) {
-		active_cell = [i, j];
-		editing_cell = [i, j];
-	}
-
-	function stopEditing(i: number, j: number) {
-		editing_cell = null;
-		setCell(i, j, getCell(i, j), { do_propagation: true, force_propagation: true });
-	}
-
-	const key = (i: number, j: number) => `${i}:${j}`;
-
-	const getCell = (i: number, j: number) => grid_vals[key(i, j)];
-	const setCell = (row: number, col: number, v: CellT, eval_config: EvalConfig) => {
-		if (v?.raw_val == null || v.raw_val === '') {
-			delete grid_vals[key(row, col)];
-			return;
-		}
-
-		grid_vals[key(row, col)] = {
-			raw_val: v.raw_val,
-			val: v.val
-		};
-
-		let msg: LeadMsg = {
-			msg_type: 'set',
-			cell: { row, col },
-			raw: v.raw_val,
-			eval_config
-		};
-
-		socket.send(JSON.stringify(msg));
-	};
+	let grid = $state(new Grid(socket));
 
 	function handleCellInteraction(i: number, j: number, e: MouseEvent) {
-		if (editing_cell) {
-			// Get the actual input element that's being edited
-			const el = document.querySelector<HTMLInputElement>('input:focus');
-			const currentInputValue = el?.value ?? '';
-
-			// ONLY treat this as a reference insert if it's a formula
-			if (currentInputValue.trim().startsWith('=')) {
-				// Prevent the input from losing focus
-				e.preventDefault();
-
-				// --- This is the same reference-inserting logic as before ---
-				const ref = refToStr(i, j);
-				if (el) {
-					const { selectionStart, selectionEnd } = el;
-					const before = el.value.slice(0, selectionStart ?? 0);
-					const after = el.value.slice(selectionEnd ?? 0);
-					el.value = before + ref + after;
-					const newPos = (selectionStart ?? 0) + ref.length;
-					el.setSelectionRange(newPos, newPos);
-					el.dispatchEvent(new Event('input', { bubbles: true }));
-					el.focus();
-				}
-
-				return;
-			}
-		}
+		let pos = new Position(i, j);
+		console.log('clicked', pos);
+		//
+		// if (grid.isEditing(pos)) {
+		// 	// Get the actual input element that's being edited
+		// 	const el = document.querySelector<HTMLInputElement>('input:focus');
+		// 	const currentInputValue = el?.value ?? '';
+		//
+		// 	// ONLY treat this as a reference insert if it's a formula
+		// 	if (currentInputValue.trim().startsWith('=')) {
+		// 		// Prevent the input from losing focus
+		// 		e.preventDefault();
+		//
+		// 		// --- This is the same reference-inserting logic as before ---
+		// 		const ref = refToStr(i, j);
+		// 		if (el) {
+		// 			const { selectionStart, selectionEnd } = el;
+		// 			const before = el.value.slice(0, selectionStart ?? 0);
+		// 			const after = el.value.slice(selectionEnd ?? 0);
+		// 			el.value = before + ref + after;
+		// 			const newPos = (selectionStart ?? 0) + ref.length;
+		// 			el.setSelectionRange(newPos, newPos);
+		// 			el.dispatchEvent(new Event('input', { bubbles: true }));
+		// 			el.focus();
+		// 		}
+		//
+		// 		return;
+		// 	}
+		// }
 
 		// We are not editing, so this is a normal cell selection OR this is not a formula
-		active_cell = [i, j];
-	}
-
-	function getActiveCell(): CellT {
-		if (active_cell != null && grid_vals[key(active_cell[0], active_cell[1])])
-			return grid_vals[key(active_cell[0], active_cell[1])];
-		else
-			return {
-				raw_val: '',
-				val: undefined
-			};
-	}
-
-	function setActiveCellRaw(raw: string): void {
-		if (active_cell == null) return;
-
-		if (grid_vals[key(active_cell[0], active_cell[1])]) {
-			let cell = grid_vals[key(active_cell[0], active_cell[1])];
-			setCell(
-				active_cell[0],
-				active_cell[1],
-				{
-					raw_val: raw,
-					val: cell.val
-				},
-				{ do_propagation: false, force_propagation: false }
-			);
-		} else {
-			setCell(
-				active_cell[0],
-				active_cell[1],
-				{
-					raw_val: raw,
-					val: undefined
-				},
-				{
-					do_propagation: false,
-					force_propagation: false
-				}
-			);
-		}
+		grid.setActive(pos);
 	}
 
 	onMount(() => {
@@ -231,15 +84,33 @@
 </script>
 
 <div class="relative mb-5 ml-5 flex items-center gap-[5px]">
-	<div class="relative">
+	<div
+		class="relative"
+		onkeydown={(e: KeyboardEvent) => {
+			if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+				e.preventDefault(); // avoid form submit/line break
+				const el = (e.currentTarget as HTMLElement).querySelector(
+					'input'
+				) as HTMLInputElement | null;
+				el?.blur(); // triggers on:blur below
+			} else if (e.key == 'Escape') {
+				e.preventDefault();
+
+				grid.stopEditingActive();
+			}
+		}}
+	>
 		<Omega
 			size="20px"
-			class="absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground"
-			strokeWidth={1}
+			class="absolute top-1/2 left-2 z-10 -translate-y-1/2 text-muted-foreground"
 		/>
 		<Input
-			bind:value={() => getActiveCell().raw_val, (raw) => setActiveCellRaw(raw)}
-			class="relative w-[200px] pl-8"
+			onmousedown={() => grid.setExternalEdit(grid.getActivePos())}
+			onblur={() => grid.setExternalEdit(null)}
+			bind:value={
+				() => grid.getActiveCell().raw_val, (raw) => grid.quickEval(grid.getActivePos(), raw)
+			}
+			class="relative w-[200px] pl-9"
 		></Input>
 	</div>
 </div>
@@ -251,8 +122,8 @@
 		<div class="sticky top-0 left-0" style="z-index: {rows + 70}">
 			<CellHeader
 				resizeable={false}
-				height={default_row_height}
-				width={default_col_width}
+				height={grid.getDefaultRowHeight()}
+				width={grid.getDefaultColWidth()}
 				val=""
 				active={false}
 				direction="blank"
@@ -261,12 +132,12 @@
 
 		{#each Array(cols) as _, j}
 			<CellHeader
-				height={default_row_height}
-				width={getColWidth(j)}
-				setColWidth={(width) => setColWidth(j, width)}
+				height={grid.getDefaultRowHeight()}
+				width={grid.getColWidth(j)}
+				setColWidth={(width) => grid.setColWidth(j, width)}
 				direction="col"
 				val={colToStr(j)}
-				active={active_cell !== null && active_cell[1] === j}
+				active={grid.getActivePos() !== null && grid.getActivePos()?.col === j}
 			/>
 		{/each}
 	</div>
@@ -275,28 +146,31 @@
 			<div class="sticky left-0 flex w-fit" style="z-index: {rows - i + 40}">
 				<CellHeader
 					direction="row"
-					width={default_col_width}
-					height={getRowHeight(i)}
-					setRowHeight={(height) => setRowHeight(i, height)}
+					height={grid.getRowHeight(i)}
+					width={grid.getDefaultColWidth()}
+					setRowHeight={(height) => grid.setRowHeight(i, height)}
 					val={(i + 1).toString()}
-					active={active_cell !== null && active_cell[0] === i}
+					active={grid.getActivePos() !== null && grid.getActivePos()?.row === i}
 				/>
 			</div>
 			{#each Array(cols) as _, j}
 				<Cell
-					height={getRowHeight(i)}
-					width={getColWidth(j)}
-					editing={editing_cell?.[0] === i && editing_cell?.[1] === j}
-					startediting={() => startEditing(i, j)}
-					stopediting={() => stopEditing(i, j)}
+					height={grid.getRowHeight(i)}
+					width={grid.getColWidth(j)}
+					editing={grid.isEditing(new Position(i, j))}
+					externalediting={grid.isExternalEditing(new Position(i, j))}
+					startediting={() => grid.startEditing(new Position(i, j))}
+					stopediting={() => grid.stopEditing(new Position(i, j))}
 					onmousedown={(e) => {
 						handleCellInteraction(i, j, e);
 					}}
 					bind:cell={
-						() => getCell(i, j),
-						(v) => setCell(i, j, v, { do_propagation: false, force_propagation: false })
+						() => grid.getCell(new Position(i, j)), (v) => grid.setCell(new Position(i, j), v)
 					}
-					active={active_cell !== null && active_cell[0] === i && active_cell[1] === j}
+					active={(() => {
+						console.log(grid.isActive(new Position(i, j)));
+						return grid.isActive(new Position(i, j));
+					})()}
 				/>
 			{/each}
 		</div>

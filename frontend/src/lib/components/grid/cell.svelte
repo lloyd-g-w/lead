@@ -13,7 +13,8 @@
 		startediting = () => {},
 		stopediting = () => {},
 		active = false,
-		editing = false
+		editing = false,
+		externalediting = false
 	}: {
 		cla?: string;
 		width?: string;
@@ -24,6 +25,7 @@
 		stopediting?: () => void;
 		active?: boolean;
 		editing?: boolean;
+		externalediting?: boolean;
 	} = $props();
 
 	// focus the first focusable descendant (the inner <input>)
@@ -101,7 +103,7 @@
 	>
 		{#if cell && (cell.raw_val !== '' || getEvalLiteral(cell.val) !== '')}
 			<span class={clsx('pointer-events-none select-none', { err: isErr(cell.val) })}>
-				{#if cell.val}
+				{#if cell.val && !externalediting}
 					{getEvalLiteral(cell.val)}
 				{:else}
 					{cell.raw_val}
