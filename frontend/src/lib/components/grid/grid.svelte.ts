@@ -208,7 +208,4 @@ class Grid {
 	}
 }
 
-export {  Position };
-
-
-export const grid = new Grid(new WebSocket(''));
+export { Position, Grid };

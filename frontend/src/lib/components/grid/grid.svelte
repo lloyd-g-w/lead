@@ -7,7 +7,7 @@
 	import clsx from 'clsx';
 	import { Input } from '../ui/input';
 	import type { LeadMsg } from './messages';
-	import { grid, Position } from './grid.svelte.ts';
+	import { Grid, Position } from './grid.svelte.ts';
 
 	let {
 		socket,
@@ -31,7 +31,8 @@
 		grid.handle_msg(res);
 	};
 
-	let rows = 50;
+	const grid = new Grid(socket);
+	let rows = 100;
 	let cols = 40;
 
 	function handleCellInteraction(i: number, j: number, e: MouseEvent) {

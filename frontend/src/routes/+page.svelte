@@ -19,7 +19,7 @@
 {/if}
 
 <div class="absolute left-0 min-h-0 w-full">
-	<div class="flex h-[100vh] flex-col">
+	<div class="flex h-[93vh] flex-col">
 		<div class="h-[60px] w-full p-3">
 			<div class="flex items-center gap-5">
 				<Sidebar.Trigger />
