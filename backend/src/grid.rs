@@ -23,8 +23,13 @@ impl Grid {
         &mut self,
         cell_ref: CellRef,
         raw_val: String,
+        do_propagation: bool,
+        force_propagation: bool,
     ) -> Result<Vec<CellRef>, String> {
-        if self.cells.contains_key(&cell_ref) && self.cells[&cell_ref].raw() == raw_val {
+        if self.cells.contains_key(&cell_ref)
+            && self.cells[&cell_ref].raw() == raw_val
+            && !force_propagation
+        {
             return Ok(Vec::new());
         }
 
@@ -43,7 +48,14 @@ impl Grid {
 
         if self.cells.contains_key(&cell_ref) {
             updated_cells = self
-                .update_exisiting_cell(raw_val, eval, precs, cell_ref)?
+                .update_exisiting_cell(
+                    raw_val,
+                    eval,
+                    precs,
+                    cell_ref,
+                    do_propagation,
+                    force_propagation,
+                )?
                 .into_iter()
                 .chain(updated_cells)
                 .collect();
@@ -156,6 +168,8 @@ impl Grid {
         new_eval: Eval,
         new_precs: HashSet<CellRef>,
         cell_ref: CellRef,
+        do_propagation: bool,
+        force_propagation: bool,
     ) -> Result<Vec<CellRef>, String> {
         let (old_precs, old_eval) = match self.cells.get_mut(&cell_ref) {
             Some(cell) => {
@@ -197,7 +211,7 @@ impl Grid {
         cell.set_precs(new_precs);
         cell.set_eval(new_eval);
 
-        if eval_changed {
+        if (eval_changed && do_propagation) || force_propagation {
             self.propagate(cell_ref)
         } else {
             Ok(Vec::new())

@@ -3,6 +3,7 @@ interface LeadMsg {
 	cell?: CellRef;
 	raw?: string;
 	eval?: Eval;
+	eval_config?: EvalConfig;
 	bulk_msgs?: Array<LeadMsg>;
 }
 
@@ -29,6 +30,11 @@ interface LeadErr {
 	code: 'DivZero' | 'TypeErr' | 'Syntax' | 'Server' | 'Unsupported';
 	desc: string;
 	title: string;
+}
+
+interface EvalConfig {
+	do_propagation: boolean;
+	force_propagation: boolean;
 }
 
 // Tagged union

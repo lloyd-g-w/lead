@@ -62,8 +62,16 @@ async fn accept_connection(stream: TcpStream) {
                     MsgType::Set => {
                         let Some(cell_ref) = req.cell else { continue };
                         let Some(raw) = req.raw else { continue };
+                        let Some(config) = req.eval_config else {
+                            continue;
+                        };
 
-                        match grid.update_cell(cell_ref.clone(), raw.to_owned()) {
+                        match grid.update_cell(
+                            cell_ref.clone(),
+                            raw.to_owned(),
+                            config.do_propagation,
+                            config.force_propagation,
+                        ) {
                             Ok(updates) => {
                                 let mut msgs = Vec::new();
 
@@ -75,6 +83,7 @@ async fn accept_connection(stream: TcpStream) {
                                             raw: Some(cell.raw()),
                                             eval: Some(cell.eval()),
                                             bulk_msgs: None,
+                                            eval_config: None,
                                         });
                                     }
                                 }
@@ -88,6 +97,7 @@ async fn accept_connection(stream: TcpStream) {
                                         cell: None,
                                         raw: None,
                                         eval: None,
+                                        eval_config: None,
                                         bulk_msgs: Some(msgs),
                                         msg_type: MsgType::Bulk,
                                     };
@@ -103,6 +113,7 @@ async fn accept_connection(stream: TcpStream) {
                                     cell: Some(cell_ref),
                                     raw: Some(e.to_string()),
                                     eval: None,
+                                    eval_config: None,
                                     bulk_msgs: None,
                                 };
                                 let _ = write

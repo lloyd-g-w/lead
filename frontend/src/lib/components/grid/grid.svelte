@@ -1,6 +1,15 @@
 <script lang="ts">
 	import { toast } from 'svelte-sonner';
-	import { Pencil } from '@lucide/svelte';
+	import {
+		Infinity,
+		Omega,
+		Parentheses,
+		Pyramid,
+		Radical,
+		Sigma,
+		SquareFunction,
+		Variable
+	} from '@lucide/svelte';
 	import Cell from '$lib/components/grid/cell.svelte';
 	import { onDestroy, onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
@@ -108,14 +117,15 @@
 		editing_cell = [i, j];
 	}
 
-	function stopEditing() {
+	function stopEditing(i: number, j: number) {
 		editing_cell = null;
+		setCell(i, j, getCell(i, j), { do_propagation: true, force_propagation: true });
 	}
 
 	const key = (i: number, j: number) => `${i}:${j}`;
 
 	const getCell = (i: number, j: number) => grid_vals[key(i, j)];
-	const setCell = (row: number, col: number, v: CellT) => {
+	const setCell = (row: number, col: number, v: CellT, eval_config: EvalConfig) => {
 		if (v?.raw_val == null || v.raw_val === '') {
 			delete grid_vals[key(row, col)];
 			return;
@@ -129,7 +139,8 @@
 		let msg: LeadMsg = {
 			msg_type: 'set',
 			cell: { row, col },
-			raw: v.raw_val
+			raw: v.raw_val,
+			eval_config
 		};
 
 		socket.send(JSON.stringify(msg));
@@ -182,37 +193,55 @@
 
 		if (grid_vals[key(active_cell[0], active_cell[1])]) {
 			let cell = grid_vals[key(active_cell[0], active_cell[1])];
-			setCell(active_cell[0], active_cell[1], {
-				raw_val: raw,
-				val: cell.val
-			});
+			setCell(
+				active_cell[0],
+				active_cell[1],
+				{
+					raw_val: raw,
+					val: cell.val
+				},
+				{ do_propagation: false, force_propagation: false }
+			);
 		} else {
-			setCell(active_cell[0], active_cell[1], {
-				raw_val: raw,
-				val: undefined
-			});
+			setCell(
+				active_cell[0],
+				active_cell[1],
+				{
+					raw_val: raw,
+					val: undefined
+				},
+				{
+					do_propagation: false,
+					force_propagation: false
+				}
+			);
 		}
 	}
 
 	onMount(() => {
-		const handler = (e: MouseEvent) => {
-			// optional: check if click target is outside grid container
-			if (!(e.target as HTMLElement).closest('.grid-wrapper')) {
-				active_cell = null;
-			}
-		};
-		window.addEventListener('click', handler);
-		onDestroy(() => window.removeEventListener('click', handler));
+		// const handler = (e: MouseEvent) => {
+		// optional: check if click target is outside grid container
+		// if (!(e.target as HTMLElement).closest('.grid-wrapper')) {
+		// 	active_cell = null;
+		// }
+		// };
+		// window.addEventListener('click', handler);
+		// onDestroy(() => window.removeEventListener('click', handler));
 	});
 </script>
 
-<div class="mb-5 ml-5 flex items-center gap-5">
-	<Pencil />
-	<Input
-		bind:value={() => getActiveCell().raw_val, (raw) => setActiveCellRaw(raw)}
-		class="relative w-[200px] rounded-none p-1 !transition-none delay-0 duration-0
-			focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
-	></Input>
+<div class="relative mb-5 ml-5 flex items-center gap-[5px]">
+	<div class="relative">
+		<Omega
+			size="20px"
+			class="absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground"
+			strokeWidth={1}
+		/>
+		<Input
+			bind:value={() => getActiveCell().raw_val, (raw) => setActiveCellRaw(raw)}
+			class="relative w-[200px] pl-8"
+		></Input>
+	</div>
 </div>
 
 <div
@@ -259,11 +288,14 @@
 					width={getColWidth(j)}
 					editing={editing_cell?.[0] === i && editing_cell?.[1] === j}
 					startediting={() => startEditing(i, j)}
-					stopediting={stopEditing}
+					stopediting={() => stopEditing(i, j)}
 					onmousedown={(e) => {
 						handleCellInteraction(i, j, e);
 					}}
-					bind:cell={() => getCell(i, j), (v) => setCell(i, j, v)}
+					bind:cell={
+						() => getCell(i, j),
+						(v) => setCell(i, j, v, { do_propagation: false, force_propagation: false })
+					}
 					active={active_cell !== null && active_cell[0] === i && active_cell[1] === j}
 				/>
 			{/each}

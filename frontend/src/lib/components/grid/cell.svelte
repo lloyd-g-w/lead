@@ -55,11 +55,22 @@
 			style="width: {width}; height: {height}"
 			class="relative rounded-none p-1 !transition-none delay-0 duration-0
 			focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
+			bind:value={
+				() => {
+					return cell?.raw_val ?? '';
+				},
+				(v) => {
+					cell = {
+						val: cell?.val,
+						raw_val: v
+					};
+				}
+			}
 			onblur={(e) => {
-				cell = {
-					val: cell?.val,
-					raw_val: (e.target as HTMLInputElement).value
-				};
+				// cell = {
+				// 	val: cell?.val,
+				// 	raw_val: (e.target as HTMLInputElement).value
+				// };
 				stopediting();
 			}}
 		/>
