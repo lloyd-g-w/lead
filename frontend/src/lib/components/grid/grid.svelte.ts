@@ -1,5 +1,6 @@
 import { toast } from 'svelte-sonner';
 import type { CellRef, CellT, Eval, LeadMsg } from './messages';
+import { refToStr } from './utils';
 
 class Position {
 	public row: number;
@@ -22,6 +23,10 @@ class Position {
 		return { row: this.row, col: this.col };
 	}
 
+	public str(): string {
+		return refToStr(this.row, this.col);
+	}
+
 	public equals(other: CellRef | null | undefined): boolean {
 		return !!other && this.row === other.row && this.col === other.col;
 	}
@@ -38,7 +43,8 @@ class Grid {
 	col_widths: Record<number, string> = $state({});
 	default_row_height: string;
 	default_col_width: string;
-	active_cell: Position | null = $state(null);
+	primary_active: Position | null = $state(null);
+	secondary_active: Position | null = $state(null);
 	editing_cell: Position | null = $state(null);
 	external_editing_cell: Position | null = $state(null);
 	editing_preview: [Eval, boolean] | null = $state(null); // [Eval, dirty]
@@ -53,8 +59,8 @@ class Grid {
 		return this.data[pos.key()];
 	}
 
-	public setCell(pos: Position | null) {
-		if (pos === null) return;
+	public setCell(pos: Position | null | undefined) {
+		if (pos === null || pos === undefined) return;
 		let data = this.data[pos.key()];
 		if (data === undefined) return;
 
@@ -83,11 +89,26 @@ class Grid {
 		this.data[pos.key()] = {
 			raw: x?.raw ?? '',
 			temp_raw: raw,
+			pos: pos,
 			eval: x?.eval ?? undefined,
 			temp_eval: x?.temp_eval ?? undefined
 		};
 
 		this.quickEval(pos, raw);
+	}
+
+	public resetCellTemp(pos: Position | null | undefined) {
+		if (!pos) return;
+
+		let x = this.data[pos.key()];
+
+		this.data[pos.key()] = {
+			raw: x?.raw ?? '',
+			pos: pos,
+			temp_raw: x?.raw ?? '',
+			eval: x?.eval ?? undefined,
+			temp_eval: undefined
+		};
 	}
 
 	public getRowHeight(row: number) {
@@ -121,8 +142,10 @@ class Grid {
 		}
 	}
 
-	public startEditing(pos: Position) {
-		this.active_cell = pos;
+	public startEditing(pos: Position | undefined) {
+		if (!pos) return;
+
+		this.setActive(pos, pos);
 		this.editing_cell = pos;
 
 		let cell = this.getCell(pos);
@@ -130,52 +153,132 @@ class Grid {
 		cell.temp_eval = undefined;
 	}
 
-	public stopEditing(pos: Position) {
+	public stopEditing(pos: Position | null | undefined) {
+		if (!pos) return;
 		this.editing_cell = null;
-		this.setCell(pos);
+		// this.setCell(pos);
 	}
 
 	public stopEditingActive() {
-		if (this.active_cell == null) return;
-		this.stopEditing(this.active_cell);
+		if (!this.anyIsActive() || !this.primary_active?.equals(this.secondary_active)) return;
+		this.stopEditing(this.primary_active);
 	}
 
 	public isEditing(pos: Position): boolean {
-		if (this.editing_cell == null) return false;
+		if (this.editing_cell === null) return false;
 		return this.editing_cell.equals(pos);
 	}
 
+	public anyIsEditing(): boolean {
+		return this.editing_cell !== null;
+	}
+
 	public isExternalEditing(pos: Position): boolean {
-		if (this.external_editing_cell == null) return false;
+		if (this.external_editing_cell === null) return false;
 		return this.external_editing_cell.equals(pos);
 	}
 
-	public setActive(pos: Position | null) {
-		this.active_cell = pos;
+	public setActive(primary: Position | null, secondary: Position | null) {
+		this.primary_active = primary;
+		this.secondary_active = secondary;
 	}
 
-	public setExternalEdit(pos: Position | null) {
+	public setInactive() {
+		this.primary_active = null;
+		this.secondary_active = null;
+	}
+
+	public startExternalEdit(pos: Position | null) {
 		this.external_editing_cell = pos;
 	}
 
+	public stopExternalEdit(pos: Position | null) {
+		this.external_editing_cell = null;
+	}
+
 	public getActiveCell(): CellT | undefined {
-		if (this.active_cell === null)
+		if (this.primary_active === null || this.secondary_active === null) {
 			return {
 				raw: '',
 				temp_raw: '',
+				pos: new Position(-1, -1),
 				eval: undefined
 			};
+		}
 
-		return this.getCell(this.active_cell);
+		if (!this.primary_active.equals(this.secondary_active)) {
+			return {
+				raw: '',
+				temp_raw: '',
+				pos: new Position(-1, -1),
+				eval: undefined
+			};
+		}
+
+		return this.getCell(this.primary_active);
 	}
 
+	public getActiveRangeStr(): string {
+	const tl = this.getActiveTopLeft();
+	const br = this.getActiveBottomRight();
+
+	if (tl === null || br === null) return '';
+
+	// Single-cell selection
+	if (tl.equals(br)) return tl.str();
+
+	// Range selection
+	return `${tl.str()}:${br.str()}`;
+}
+
+
 	public getActivePos(): Position | null {
-		return this.active_cell;
+		if (
+			this.primary_active === null ||
+			this.secondary_active === null ||
+			!this.primary_active.equals(this.secondary_active)
+		) {
+			return null;
+		}
+		return this.primary_active;
 	}
 
 	public isActive(pos: Position): boolean {
-		if (this.active_cell == null) return false;
-		return this.active_cell.equals(pos);
+		if (this.primary_active === null || this.secondary_active === null) return false;
+
+		return (
+			pos.row >= Math.min(this.primary_active.row, this.secondary_active.row) &&
+			pos.row <= Math.max(this.primary_active.row, this.secondary_active.row) &&
+			pos.col >= Math.min(this.primary_active.col, this.secondary_active.col) &&
+			pos.col <= Math.max(this.primary_active.col, this.secondary_active.col)
+		);
+	}
+
+	public getActiveTopLeft(): Position | null {
+		if (this.primary_active === null || this.secondary_active === null) return null;
+
+		return new Position(
+			Math.min(this.primary_active.row, this.secondary_active.row),
+			Math.min(this.primary_active.col, this.secondary_active.col)
+		);
+	}
+
+	public getActiveBottomRight(): Position | null {
+		if (this.primary_active === null || this.secondary_active === null) return null;
+
+		return new Position(
+			Math.max(this.primary_active.row, this.secondary_active.row),
+			Math.max(this.primary_active.col, this.secondary_active.col)
+		);
+	}
+
+	public isPrimaryActive(pos: Position): boolean {
+		if (this.primary_active === null) return false;
+		return this.primary_active.equals(pos);
+	}
+
+	public anyIsActive(): boolean {
+		return this.primary_active !== null && this.secondary_active !== null;
 	}
 
 	public quickEval(pos: Position | null, raw: string) {
@@ -214,6 +317,7 @@ class Grid {
 				this.data[pos.key()] = {
 					raw: msg.raw ?? '',
 					eval: msg.eval,
+					pos: pos,
 					temp_raw: x?.temp_raw ?? '',
 					temp_eval: x?.temp_eval ?? undefined
 				};

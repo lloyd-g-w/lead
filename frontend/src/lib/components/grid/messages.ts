@@ -1,3 +1,5 @@
+import type { Position } from "./grid.svelte.ts";
+
 interface LeadMsg {
 	msg_type: 'set' | 'get' | 'error' | 'bulk' | 'eval';
 	cell?: CellRef;
@@ -48,6 +50,7 @@ type Eval =
 interface CellT {
 	raw: string;
 	temp_raw: string;
+	pos: Position;
 	temp_eval?: Eval;
 	eval?: Eval;
 }
