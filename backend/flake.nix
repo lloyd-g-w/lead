@@ -1,5 +1,5 @@
 {
-  description = "lead-rust";
+  description = "lead";
 
   inputs = {
     naersk.url = "github:nix-community/naersk";
@@ -26,6 +26,11 @@
           src = ./.;
           buildInputs = buildInputs;
           nativeBuildInputs = nativeBuildInputs;
+        };
+
+        apps.${system}.default = {
+          type = "app";
+          program = "${self.packages.${system}.default}/bin/lead";
         };
 
         devShells.${system}.default = pkgs.mkShell {
