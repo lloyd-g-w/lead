@@ -80,8 +80,6 @@
 				grid.stopEditingActive();
 			}
 		};
-		window.addEventListener('click', handler);
-		onDestroy(() => window.removeEventListener('click', handler));
 
 		const handleMouseMove = (e: MouseEvent) => {
 			if (!dragging) return;
@@ -92,20 +90,34 @@
 				const row = parseInt(el.dataset.row, 10);
 				const col = parseInt(el.dataset.col, 10);
 
-				// expand selection as you drag
-				console.log(`moved to ${refToStr(row, col)}`);
 				grid.setActive(grid.primary_active, new Position(row, col));
 			}
 		};
 
-		const handleMouseUp = () => {
+		const handleMouseUp = (e: MouseEvent) => {
 			dragging = false; // stop tracking
+			//
+			// const el = document.elementFromPoint(e.clientX, e.clientY);
+			//
+			// if (el && el instanceof HTMLElement && el.dataset.row && el.dataset.col) {
+			// 	const row = parseInt(el.dataset.row, 10);
+			// 	const col = parseInt(el.dataset.col, 10);
+			//
+			// 	// expand selection as you drag
+			// 	let pos = new Position(row, col);
+			//
+			// 	if (grid.isActive(pos) && grid.isEditing(pos)) return;
+			//
+			// 	grid.stopAnyEditing();
+			// }
 		};
 
+		window.addEventListener('click', handler);
 		window.addEventListener('mousemove', handleMouseMove);
 		window.addEventListener('mouseup', handleMouseUp);
 
 		onDestroy(() => {
+			window.removeEventListener('click', handler);
 			window.removeEventListener('mousemove', handleMouseMove);
 			window.removeEventListener('mouseup', handleMouseUp);
 		});
@@ -216,7 +228,6 @@
 					height={grid.getRowHeight(i)}
 					width={grid.getColWidth(j)}
 					onmousedown={(e) => {
-						console.log(`down at ${refToStr(i, j)}`);
 						handleCellMouseDown(i, j, e);
 					}}
 				/>

@@ -102,12 +102,29 @@
 		{onmousedown}
 		data-row={pos.row}
 		data-col={pos.col}
+		ondragstart={(e) => e.preventDefault()}
 		style:width
 		style:height
-		class={clsx('placeholder bg-background p-1', { primaryactive, active }, cla)}
+		class={clsx(
+			'placeholder bg-background p-1',
+			{
+				primaryactive,
+				active,
+				'active-top': grid.isActiveTop(pos),
+				'active-bottom': grid.isActiveBottom(pos),
+				'active-right': grid.isActiveRight(pos),
+				'active-left': grid.isActiveLeft(pos),
+				'only-active': grid.isActive(pos) && grid.isSingleActive()
+			},
+			cla
+		)}
 	>
 		{#if cell && (cell.raw !== '' || getEvalLiteral(cell.eval) !== '')}
-			<span class={clsx('pointer-events-none select-none', { err: isErr(cell.eval) })}>
+			<span
+				class={clsx('pointer-events-none select-none', {
+					err: isErr(cell.eval)
+				})}
+			>
 				{#if externalediting}
 					{cell.temp_raw}
 				{:else if cell.eval}
@@ -129,17 +146,37 @@
 	}
 
 	.primaryactive {
-		z-index: 30;
-		border: 1px solid var(--color-primary);
+		z-index: 30 !important;
+		border: 1px solid var(--color-primary) !important;
 		outline: 1px solid var(--color-primary);
 	}
 
 	.active {
 		z-index: 20;
-		background-color: color-mix(in oklab, var(--color-primary) 50%, var(--color-background) 90%);
-
-		/* border: 1px solid var(--color-primary); */
+		background-color: color-mix(in oklab, var(--color-primary) 20%, var(--color-background) 80%);
+		border: 1px solid color-mix(in oklab, var(--input) 100%, var(--color-foreground) 5%);
 		/* outline: 1px solid var(--color-primary); */
+	}
+
+	.only-active {
+		background-color: transparent !important;
+	}
+
+	/* Borders for edges */
+	.active-top {
+		border-top: 1px solid var(--color-primary);
+	}
+
+	.active-bottom {
+		border-bottom: 1px solid var(--color-primary);
+	}
+
+	.active-left {
+		border-left: 1px solid var(--color-primary);
+	}
+
+	.active-right {
+		border-right: 1px solid var(--color-primary);
 	}
 
 	.active:has(.err),

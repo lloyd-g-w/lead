@@ -126,6 +126,30 @@ class Grid {
 		return this.default_row_height;
 	}
 
+	public isActiveTop(pos: Position): boolean {
+		const tl = this.getActiveTopLeft();
+		if (!tl) return false;
+		return this.isActive(pos) && pos.row === tl.row;
+	}
+
+	public isActiveBottom(pos: Position): boolean {
+		const br = this.getActiveBottomRight();
+		if (!br) return false;
+		return this.isActive(pos) && pos.row === br.row;
+	}
+
+	public isActiveLeft(pos: Position): boolean {
+		const tl = this.getActiveTopLeft();
+		if (!tl) return false;
+		return this.isActive(pos) && pos.col === tl.col;
+	}
+
+	public isActiveRight(pos: Position): boolean {
+		const br = this.getActiveBottomRight();
+		if (!br) return false;
+		return this.isActive(pos) && pos.col === br.col;
+	}
+
 	public setRowHeight(row: number, height: string) {
 		if (height === this.default_row_height) {
 			delete this.row_heights[row];
@@ -157,6 +181,10 @@ class Grid {
 		if (!pos) return;
 		this.editing_cell = null;
 		// this.setCell(pos);
+	}
+
+	public stopAnyEditing() {
+		this.editing_cell = null;
 	}
 
 	public stopEditingActive() {
@@ -219,18 +247,17 @@ class Grid {
 	}
 
 	public getActiveRangeStr(): string {
-	const tl = this.getActiveTopLeft();
-	const br = this.getActiveBottomRight();
+		const tl = this.getActiveTopLeft();
+		const br = this.getActiveBottomRight();
 
-	if (tl === null || br === null) return '';
+		if (tl === null || br === null) return '';
 
-	// Single-cell selection
-	if (tl.equals(br)) return tl.str();
+		// Single-cell selection
+		if (tl.equals(br)) return tl.str();
 
-	// Range selection
-	return `${tl.str()}:${br.str()}`;
-}
-
+		// Range selection
+		return `${tl.str()}:${br.str()}`;
+	}
 
 	public getActivePos(): Position | null {
 		if (
@@ -275,6 +302,10 @@ class Grid {
 	public isPrimaryActive(pos: Position): boolean {
 		if (this.primary_active === null) return false;
 		return this.primary_active.equals(pos);
+	}
+
+	public isSingleActive(): boolean {
+		return this.getActivePos() !== null;
 	}
 
 	public anyIsActive(): boolean {
