@@ -12,6 +12,7 @@
     naersk,
     nixpkgs,
     flake-utils,
+    ...
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
@@ -21,20 +22,16 @@
         naerskLib = pkgs.callPackage naersk {};
         buildInputs = [pkgs.openssl];
         nativeBuildInputs = [pkgs.pkg-config];
-      in {
-        packages.${system}.default = naerskLib.buildPackage {
+        lead = naerskLib.buildPackage {
           src = ./.;
           buildInputs = buildInputs;
           nativeBuildInputs = nativeBuildInputs;
         };
+      in {
+        packages.default = lead;
 
-        apps.${system}.default = {
-          type = "app";
-          program = "${self.packages.${system}.default}/bin/lead";
-        };
-
-        devShells.${system}.default = pkgs.mkShell {
-          inputsFrom = [self.packages.${system}.default];
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [lead];
 
           packages = with pkgs; [
             rustc
