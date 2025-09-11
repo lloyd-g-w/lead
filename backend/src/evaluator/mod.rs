@@ -1,14 +1,16 @@
 use serde::{Deserialize, Serialize};
 
-use crate::cell::CellRef;
-use crate::common::LeadErr;
-use crate::common::LeadErrCode;
-use crate::common::Literal;
-use crate::grid::Grid;
-use crate::parser::*;
-use std::collections::HashSet;
-use std::f64;
-use std::fmt;
+use crate::{
+    cell::CellRef,
+    common::{LeadErr, LeadErrCode, Literal},
+    evaluator::utils::*,
+    grid::Grid,
+    parser::*,
+};
+
+use std::{collections::HashSet, f64, fmt};
+
+mod utils;
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -263,37 +265,6 @@ fn eval_avg(
         })
     } else {
         Ok(Eval::Literal(Literal::Number(res / count as f64)))
-    }
-}
-
-fn eval_single_arg_numeric(
-    args: &Vec<Expr>,
-    precs: &mut HashSet<CellRef>,
-    grid: Option<&Grid>,
-    func: fn(f64) -> f64,
-    func_name: String,
-) -> Result<Eval, LeadErr> {
-    if args.len() != 1 {
-        return Err(LeadErr {
-            title: "Evaluation error.".into(),
-            desc: format!("{func_name} function requires a single argument."),
-            code: LeadErrCode::Invalid,
-        });
-    }
-
-    let err = LeadErr {
-        title: "Evaluation error.".into(),
-        desc: format!("{func_name} function requires a numeric argument."),
-        code: LeadErrCode::TypeErr,
-    };
-
-    match evaluate_expr(&args[0], precs, grid)? {
-        Eval::Literal(Literal::Number(num)) => Ok(Eval::Literal(Literal::Number(func(num)))),
-        Eval::CellRef { eval, .. } => match *eval {
-            Eval::Literal(Literal::Number(n)) => Ok(Eval::Literal(Literal::Number(func(n)))),
-            _ => Err(err),
-        },
-        _ => Err(err),
     }
 }
 

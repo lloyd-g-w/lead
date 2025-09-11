@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { Omega } from '@lucide/svelte';
+	import { EllipsisVertical, Omega } from '@lucide/svelte';
+	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Cell from '$lib/components/grid/cell.svelte';
-	import { onMount } from 'svelte';
 	import CellHeader from './cell-header.svelte';
 	import { colToStr, refToStr } from './utils';
 	import clsx from 'clsx';
 	import { Input } from '../ui/input';
 	import type { LeadMsg } from './messages';
 	import { Grid, Position } from './grid.svelte.ts';
+	import { onDestroy, onMount } from 'svelte';
 
 	let {
 		socket,
@@ -31,14 +32,16 @@
 		grid.handle_msg(res);
 	};
 
-	const grid = new Grid(socket);
-	let rows = 10;
-	let cols = 10;
+	const grid = $state(new Grid(socket));
+	let rows = 100;
+	let cols = 50;
 
-	function handleCellInteraction(i: number, j: number, e: MouseEvent) {
+	let dragging = $state(false);
+
+	function handleCellMouseDown(i: number, j: number, e: MouseEvent) {
 		let pos = new Position(i, j);
 
-		if (grid.isEditing(pos)) {
+		if (grid.anyIsEditing()) {
 			// Get the actual input element that's being edited
 			const el = document.querySelector<HTMLInputElement>('input:focus');
 			const currentInputValue = el?.value ?? '';
@@ -66,35 +69,92 @@
 		}
 
 		// We are not editing, so this is a normal cell selection OR this is not a formula
-		grid.setActive(pos);
+		grid.setActive(pos, pos);
+		dragging = true;
 	}
 
 	onMount(() => {
-		// const handler = (e: MouseEvent) => {
-		// optional: check if click target is outside grid container
-		// if (!(e.target as HTMLElement).closest('.grid-wrapper')) {
-		// 	active_cell = null;
-		// }
-		// };
-		// window.addEventListener('click', handler);
-		// onDestroy(() => window.removeEventListener('click', handler));
+		const handler = (e: MouseEvent) => {
+			// optional: check if click target is outside grid container
+			if (!(e.target as HTMLElement).closest('.grid-wrapper')) {
+				grid.stopEditingActive();
+			}
+		};
+
+		const handleMouseMove = (e: MouseEvent) => {
+			if (!dragging) return;
+
+			const el = document.elementFromPoint(e.clientX, e.clientY);
+
+			if (el && el instanceof HTMLElement && el.dataset.row && el.dataset.col) {
+				const row = parseInt(el.dataset.row, 10);
+				const col = parseInt(el.dataset.col, 10);
+
+				grid.setActive(grid.primary_active, new Position(row, col));
+			}
+		};
+
+		const handleMouseUp = (e: MouseEvent) => {
+			dragging = false; // stop tracking
+			//
+			// const el = document.elementFromPoint(e.clientX, e.clientY);
+			//
+			// if (el && el instanceof HTMLElement && el.dataset.row && el.dataset.col) {
+			// 	const row = parseInt(el.dataset.row, 10);
+			// 	const col = parseInt(el.dataset.col, 10);
+			//
+			// 	// expand selection as you drag
+			// 	let pos = new Position(row, col);
+			//
+			// 	if (grid.isActive(pos) && grid.isEditing(pos)) return;
+			//
+			// 	grid.stopAnyEditing();
+			// }
+		};
+
+		window.addEventListener('click', handler);
+		window.addEventListener('mousemove', handleMouseMove);
+		window.addEventListener('mouseup', handleMouseUp);
+
+		onDestroy(() => {
+			window.removeEventListener('click', handler);
+			window.removeEventListener('mousemove', handleMouseMove);
+			window.removeEventListener('mouseup', handleMouseUp);
+		});
 	});
 </script>
 
 <div class="relative mb-5 ml-5 flex items-center gap-[5px]">
+	<Alert.Root
+		class={clsx(
+			'flex h-9 w-fit min-w-[80px] rounded-md border border-input bg-transparent px-2 text-sm font-medium shadow-xs ring-offset-background transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30',
+			'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+			'flex items-center justify-center aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40'
+		)}
+	>
+		{grid.getActiveRangeStr()}
+	</Alert.Root>
+
+	<EllipsisVertical class="text-muted-foreground" size="20px" />
+
 	<div
 		class="relative"
 		onkeydown={(e: KeyboardEvent) => {
+			const target = e.currentTarget as HTMLElement;
+			const input = target.querySelector('input') as HTMLInputElement | null;
+
 			if (e.key === 'Enter' || e.key === 'NumpadEnter') {
 				e.preventDefault(); // avoid form submit/line break
-				const el = (e.currentTarget as HTMLElement).querySelector(
-					'input'
-				) as HTMLInputElement | null;
-				el?.blur(); // triggers on:blur below
+
+				grid.stopExternalEdit(grid.getActivePos());
+				grid.setCell(grid.getActivePos());
+				input?.blur();
 			} else if (e.key == 'Escape') {
 				e.preventDefault();
 
-				grid.stopEditingActive();
+				grid.stopExternalEdit(grid.getActivePos());
+				grid.resetCellTemp(grid.getActivePos());
+				input?.blur();
 			}
 		}}
 	>
@@ -103,24 +163,22 @@
 			class="absolute top-1/2 left-2 z-10 -translate-y-1/2 text-muted-foreground"
 		/>
 		<Input
-			onmousedown={() => grid.setExternalEdit(grid.getActivePos())}
-			onblur={() => grid.setCell(grid.getActivePos())}
+			disabled={grid.getActivePos() === null}
+			onmousedown={() => grid.startExternalEdit(grid.getActivePos())}
+			onblur={() => grid.stopExternalEdit(grid.getActivePos())}
 			bind:value={
 				() => grid.getActiveCell()?.temp_raw ?? '',
 				(v) => {
 					grid.setCellTemp(grid.getActivePos(), v);
 				}
 			}
-			class="relative w-[200px] pl-9"
+			class="relative w-fit min-w-[300px] pl-9"
 		></Input>
 	</div>
 </div>
 
 <div
-	class={clsx(
-		' grid-wrapper relative h-full min-h-0 max-w-full min-w-0 overflow-auto overflow-visible',
-		className
-	)}
+	class={clsx(' grid-wrapper relative h-full min-h-0 max-w-full min-w-0 overflow-auto', className)}
 >
 	<div class="sticky top-0 flex w-fit" style="z-index: {rows + 70}">
 		<div class="sticky top-0 left-0" style="z-index: {rows + 70}">
@@ -141,7 +199,10 @@
 				setColWidth={(width) => grid.setColWidth(j, width)}
 				direction="col"
 				val={colToStr(j)}
-				active={grid.getActivePos() !== null && grid.getActivePos()?.col === j}
+				active={grid.primary_active !== null &&
+					grid.secondary_active !== null &&
+					j >= Math.min(grid.primary_active.col, grid.secondary_active.col) &&
+					j <= Math.max(grid.primary_active.col, grid.secondary_active.col)}
 			/>
 		{/each}
 	</div>
@@ -154,25 +215,21 @@
 					width={grid.getDefaultColWidth()}
 					setRowHeight={(height) => grid.setRowHeight(i, height)}
 					val={(i + 1).toString()}
-					active={grid.getActivePos() !== null && grid.getActivePos()?.row === i}
+					active={grid.primary_active !== null &&
+						grid.secondary_active !== null &&
+						i >= Math.min(grid.primary_active.row, grid.secondary_active.row) &&
+						i <= Math.max(grid.primary_active.row, grid.secondary_active.row)}
 				/>
 			</div>
 			{#each Array(cols) as _, j}
 				<Cell
+					{grid}
+					pos={new Position(i, j)}
 					height={grid.getRowHeight(i)}
 					width={grid.getColWidth(j)}
-					editing={grid.isEditing(new Position(i, j))}
-					externalediting={grid.isExternalEditing(new Position(i, j))}
-					startediting={() => grid.startEditing(new Position(i, j))}
-					stopediting={() => grid.stopEditing(new Position(i, j))}
 					onmousedown={(e) => {
-						handleCellInteraction(i, j, e);
+						handleCellMouseDown(i, j, e);
 					}}
-					bind:cell={
-						() => grid.getCell(new Position(i, j)),
-						(v) => grid.setCellTemp(new Position(i, j), v?.temp_raw)
-					}
-					active={grid.isActive(new Position(i, j))}
 				/>
 			{/each}
 		</div>

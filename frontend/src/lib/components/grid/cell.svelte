@@ -3,31 +3,30 @@
 	import clsx from 'clsx';
 	import { getErrDesc, getErrTitle, getEvalLiteral, isErr } from './utils';
 	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
-	import type { CellT } from './messages';
+	import { Position, type Grid } from './grid.svelte.ts';
 
 	let {
 		cla = '',
-		width = '80px',
-		height = '30px',
-		cell = $bindable(undefined),
+		pos,
 		onmousedown = () => {},
-		startediting = () => {},
-		stopediting = () => {},
-		active = false,
-		editing = false,
-		externalediting = false
+		grid
 	}: {
 		cla?: string;
 		width?: string;
 		height?: string;
-		cell?: CellT;
+		grid: Grid;
+		pos: Position;
 		onmousedown?: (e: MouseEvent) => void;
-		startediting?: () => void;
-		stopediting?: () => void;
-		active?: boolean;
-		editing?: boolean;
-		externalediting?: boolean;
 	} = $props();
+
+	let cell = $derived(grid.getCell(pos));
+	let active = $derived(grid.isActive(pos));
+	let primaryactive = $derived(grid.isPrimaryActive(pos));
+	let editing = $derived(grid.isEditing(pos));
+	let externalediting = $derived(grid.isExternalEditing(pos));
+	let width = $derived(grid.getColWidth(pos.col));
+	let height = $derived(grid.getRowHeight(pos.row));
+	let showPreview = $derived(getPreview() !== '');
 
 	// focus the first focusable descendant (the inner <input>)
 	function autofocusWithin(node: HTMLElement) {
@@ -47,22 +46,21 @@
 			el?.blur(); // triggers on:blur below
 		} else if (e.key == 'Escape') {
 			e.preventDefault();
-			stopediting();
+			grid.stopEditing(pos);
+			grid.resetCellTemp(pos);
 		}
 	}
 
 	function getPreview() {
 		return !isErr(cell?.temp_eval) ? getEvalLiteral(cell?.temp_eval) : '';
 	}
-
-	let showPreview = $derived(getPreview() !== '');
 </script>
 
 {#if editing}
 	<div class="relative inline-block">
 		{#if showPreview}
 			<h3
-				class="bubble pointer-events-none absolute -top-[6px] -left-1 z-[500] -translate-y-full text-sm font-semibold tracking-tight text-foreground select-none"
+				class="bubble pointer-events-none absolute top-1/2 left-[2px] z-[500] -translate-y-[calc(50%+2.5em)] text-sm font-semibold tracking-tight text-foreground select-none"
 				role="tooltip"
 			>
 				{getPreview()}
@@ -74,16 +72,16 @@
 				style="width: {width}; height: {height}"
 				class="relative rounded-none p-1 !transition-none delay-0 duration-0
         focus:z-20 focus:shadow-[0_0_0_1px_var(--color-primary)] focus:outline-none"
-				bind:value={
-					() => cell?.temp_raw ?? '',
-					(v) => (cell = { eval: cell?.eval, raw: cell?.raw ?? '', temp_raw: v })
-				}
-				onblur={stopediting}
+				bind:value={() => cell?.temp_raw ?? '', (v) => grid.setCellTemp(pos, v)}
+				onblur={() => {
+					grid.stopEditing(cell?.pos);
+					grid.setCell(cell?.pos);
+				}}
 			/>
 		</div>
 	</div>
 {:else if cell && isErr(cell.eval)}
-	<HoverCard.Root openDelay={500} closeDelay={500}>
+	<HoverCard.Root openDelay={500} closeDelay={100}>
 		<HoverCard.Trigger>
 			{@render InnerCell()}
 		</HoverCard.Trigger>
@@ -100,15 +98,36 @@
 
 {#snippet InnerCell()}
 	<div
-		ondblclick={startediting}
+		ondblclick={() => grid.startEditing(pos)}
 		{onmousedown}
+		data-row={pos.row}
+		data-col={pos.col}
+		ondragstart={(e) => e.preventDefault()}
 		style:width
 		style:height
-		class={clsx('placeholder bg-background p-1', { active }, cla)}
+		class={clsx(
+			'placeholder bg-background p-1',
+			{
+				primaryactive,
+				active,
+				'active-top': grid.isActiveTop(pos),
+				'active-bottom': grid.isActiveBottom(pos),
+				'active-right': grid.isActiveRight(pos),
+				'active-left': grid.isActiveLeft(pos),
+				'only-active': grid.isActive(pos) && grid.isSingleActive()
+			},
+			cla
+		)}
 	>
 		{#if cell && (cell.raw !== '' || getEvalLiteral(cell.eval) !== '')}
-			<span class={clsx('pointer-events-none select-none', { err: isErr(cell.eval) })}>
-				{#if cell.eval && !externalediting}
+			<span
+				class={clsx('pointer-events-none select-none', {
+					err: isErr(cell.eval)
+				})}
+			>
+				{#if externalediting}
+					{cell.temp_raw}
+				{:else if cell.eval}
 					{getEvalLiteral(cell.eval)}
 				{:else}
 					{cell.raw}
@@ -126,10 +145,38 @@
 		text-overflow: clip;
 	}
 
+	.primaryactive {
+		z-index: 30 !important;
+		border: 1px solid var(--color-primary) !important;
+		outline: 1px solid var(--color-primary);
+	}
+
 	.active {
 		z-index: 20;
-		border: 1px solid var(--color-primary);
-		outline: 1px solid var(--color-primary);
+		background-color: color-mix(in oklab, var(--color-primary) 20%, var(--color-background) 80%);
+		border: 1px solid color-mix(in oklab, var(--input) 100%, var(--color-foreground) 5%);
+		/* outline: 1px solid var(--color-primary); */
+	}
+
+	.only-active {
+		background-color: transparent !important;
+	}
+
+	/* Borders for edges */
+	.active-top {
+		border-top: 1px solid var(--color-primary);
+	}
+
+	.active-bottom {
+		border-bottom: 1px solid var(--color-primary);
+	}
+
+	.active-left {
+		border-left: 1px solid var(--color-primary);
+	}
+
+	.active-right {
+		border-right: 1px solid var(--color-primary);
 	}
 
 	.active:has(.err),
