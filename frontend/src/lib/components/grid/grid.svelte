@@ -66,6 +66,8 @@
 
 				return;
 			}
+
+			grid.stopAnyEditing();
 		}
 
 		// We are not editing, so this is a normal cell selection OR this is not a formula
