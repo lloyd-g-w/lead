@@ -20,6 +20,7 @@ pub enum LeadErrCode {
     Server,
     Unsupported,
     Invalid,
+    Ref,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

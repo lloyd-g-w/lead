@@ -51,18 +51,18 @@
 			</Sidebar.GroupLabel>
 			<Sidebar.GroupContent>
 				<Sidebar.Menu>
-					{#each items as item (item.title)}
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton>
-								{#snippet child({ props })}
-									<a href={item.url} {...props}>
-										<item.icon />
-										<span>{item.title}</span>
-									</a>
-								{/snippet}
-							</Sidebar.MenuButton>
-						</Sidebar.MenuItem>
-					{/each}
+					<!-- {#each items as item (item.title)} -->
+					<!-- 	<Sidebar.MenuItem> -->
+					<!-- 		<Sidebar.MenuButton> -->
+					<!-- 			{#snippet child({ props })} -->
+					<!-- 				<a href={item.url} {...props}> -->
+					<!-- 					<item.icon /> -->
+					<!-- 					<span>{item.title}</span> -->
+					<!-- 				</a> -->
+					<!-- 			{/snippet} -->
+					<!-- 		</Sidebar.MenuButton> -->
+					<!-- 	</Sidebar.MenuItem> -->
+					<!-- {/each} -->
 				</Sidebar.Menu>
 			</Sidebar.GroupContent>
 		</Sidebar.Group>

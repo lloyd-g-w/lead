@@ -4,7 +4,7 @@ use log::info;
 
 use crate::{
     cell::{Cell, CellRef},
-    common::Literal,
+    common::{LeadErr, LeadErrCode, Literal},
     evaluator::{Eval, evaluate},
 };
 
@@ -43,7 +43,7 @@ impl Grid {
 
         if self.cells.contains_key(&cell_ref) {
             updated_cells = self
-                .update_exisiting_cell(raw_val, eval, precs, cell_ref)?
+                .update_exisiting_cell(raw_val, eval, precs, cell_ref)
                 .into_iter()
                 .chain(updated_cells)
                 .collect();
@@ -85,39 +85,22 @@ impl Grid {
     // This is a topological order on the precedents graph
     // i.e. if a requires b (e.g. a = 1 + b) then a -> b
     // so a comes before b in the topo order
-    fn topo_order(&self, from: CellRef) -> Result<Vec<CellRef>, String> {
-        let mut res: Vec<CellRef> = Vec::new();
-        let mut search_set = Vec::new();
+    fn topo_order(&self, from: CellRef) -> (Vec<CellRef>, bool) {
+        let mut res = Vec::new();
         let mut temp = HashSet::new();
         let mut perm = HashSet::new();
+        let mut cycle_detected = false;
 
-        search_set.push(from);
+        self.topo_visit(
+            from,
+            &mut temp,
+            &mut perm,
+            &mut res,
+            &mut cycle_detected,
+            from,
+        );
 
-        let cell_data = &self.cells[&from];
-        search_set.extend(cell_data.deps().iter());
-
-        temp.insert(from);
-        perm.insert(from); // Make this inside the inner topo_visit
-
-        let mut searched = 1;
-
-        while searched != search_set.len() {
-            if perm.contains(&search_set[searched]) {
-                searched += 1;
-                continue;
-            }
-
-            self.topo_visit(
-                search_set[searched],
-                &mut temp,
-                &mut perm,
-                &mut search_set,
-                &mut res,
-            )?;
-            searched += 1;
-        }
-
-        Ok(res)
+        (res, cycle_detected)
     }
 
     fn topo_visit(
@@ -125,38 +108,38 @@ impl Grid {
         cell: CellRef,
         temp: &mut HashSet<CellRef>,
         perm: &mut HashSet<CellRef>,
-        search_set: &mut Vec<CellRef>,
         res: &mut Vec<CellRef>,
-    ) -> Result<(), String> {
+        cycle_detected: &mut bool,
+        caller: CellRef,
+    ) {
         if perm.contains(&cell) {
-            return Ok(());
-        }
-        if temp.contains(&cell) {
-            return Err("Evalutation error: Cycle detected in cell refs.".into());
+            return;
         }
 
-        temp.insert(cell);
+        if !temp.insert(cell) {
+            *cycle_detected = true;
+            return;
+        }
 
         if !self.cells.contains_key(&cell) {
             perm.insert(cell);
             res.push(cell);
-            return Ok(());
+            return;
         }
 
-        let cell_data = &self.cells[&cell];
-
-        search_set.extend(cell_data.deps().iter());
-        // search_set.extend(cell_data.precedents.iter().cloned());
-
-        for prec in cell_data.precs().iter() {
-            self.topo_visit(*prec, temp, perm, search_set, res)?;
+        // Walk dependencies if this cell exists; otherwise treat as leaf/external ref.
+        if let Some(cell_data) = self.cells.get(&cell) {
+            for &dep in cell_data.deps().iter() {
+                self.topo_visit(dep, temp, perm, res, cycle_detected, caller);
+            }
         }
 
+        // Done exploring this node
+        temp.remove(&cell);
         perm.insert(cell);
-
-        res.push(cell);
-
-        Ok(())
+        if cell != caller {
+            res.push(cell);
+        }
     }
 
     fn update_exisiting_cell(
@@ -165,13 +148,13 @@ impl Grid {
         new_eval: Eval,
         new_precs: HashSet<CellRef>,
         cell_ref: CellRef,
-    ) -> Result<Vec<CellRef>, String> {
+    ) -> Vec<CellRef> {
         let (old_precs, old_eval) = match self.cells.get_mut(&cell_ref) {
             Some(cell) => {
                 cell.set_raw(raw);
                 (cell.precs().clone(), cell.eval().clone())
             }
-            None => return Ok(Vec::new()),
+            None => return Vec::new(),
         };
 
         // diffs (outside any borrow)
@@ -204,12 +187,24 @@ impl Grid {
 
         let cell = self.cells.get_mut(&cell_ref).unwrap(); // Should be impossible to crash
         cell.set_precs(new_precs);
-        cell.set_eval(new_eval);
 
         if eval_changed {
-            self.propagate(cell_ref)
+            cell.set_eval(new_eval);
+            match self.propagate(cell_ref) {
+                Ok(affected_cells) => affected_cells,
+                Err(affected_cells) => {
+                    let cell = self.cells.get_mut(&cell_ref).unwrap();
+                    cell.set_eval(Eval::Err(LeadErr {
+                        title: "Propagation error.".into(),
+                        desc: "Circular dependencies detected.".into(),
+                        code: LeadErrCode::Ref,
+                    }));
+
+                    affected_cells
+                }
+            }
         } else {
-            Ok(Vec::new())
+            Vec::new()
         }
     }
 
@@ -239,32 +234,41 @@ impl Grid {
         );
     }
 
-    fn propagate(&mut self, from: CellRef) -> Result<Vec<CellRef>, String> {
-        let mut res = Vec::new();
-        let topo = self.topo_order(from)?;
+    fn propagate(&mut self, from: CellRef) -> Result<Vec<CellRef>, Vec<CellRef>> {
+        let (topo, cycle_detected) = self.topo_order(from);
 
-        for cell_ref in topo {
-            res.push(cell_ref);
-
-            let raw = if let Some(cell) = self.cells.get(&cell_ref) {
-                let s = cell.raw();
-                if let Some(rest) = s.strip_prefix('=') {
-                    rest.to_owned()
+        if !cycle_detected {
+            for cell_ref in topo.to_owned() {
+                let raw = if let Some(cell) = self.cells.get(&cell_ref) {
+                    let s = cell.raw();
+                    if let Some(rest) = s.strip_prefix('=') {
+                        rest.to_owned()
+                    } else {
+                        continue;
+                    }
                 } else {
                     continue;
+                };
+
+                let (e, _) = evaluate(raw, Some(self));
+
+                if let Some(cell) = self.cells.get_mut(&cell_ref) {
+                    cell.set_eval(e);
                 }
-            } else {
-                continue;
-            };
-
-            // Now we dropped the borrow of self.cells before this point
-            let (e, _) = evaluate(raw, Some(self));
-
-            if let Some(cell) = self.cells.get_mut(&cell_ref) {
-                cell.set_eval(e);
             }
+            Ok(topo)
+        } else {
+            let err = LeadErr {
+                title: "Propagation error.".into(),
+                desc: "Circular dependencies detected.".into(),
+                code: LeadErrCode::Ref,
+            };
+            topo.iter().for_each(|cell_ref| {
+                if let Some(cell) = self.cells.get_mut(&cell_ref) {
+                    cell.set_eval(Eval::Err(err.to_owned()));
+                }
+            });
+            Err(topo)
         }
-
-        Ok(res)
     }
 }
