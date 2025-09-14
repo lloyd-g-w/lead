@@ -35,51 +35,84 @@
 	const grid = $state(new Grid(socket));
 	let rows = 100;
 	let cols = 50;
+	// --- module-level state ------------------------------------------------------
+	let dragging = false;
 
-	let dragging = $state(false);
+	// range picking while editing a formula:
+	let selectingRangeForFormula = false;
+	let anchorRow = -1;
+	let anchorCol = -1;
+	let hoverRow = -1;
+	let hoverCol = -1;
+	let formulaCaretStart: number | null = null;
+	let formulaCaretEnd: number | null = null;
 
+	// helper: A1 or A1:B9 using your existing refToStr()
+	function rangeRef(r1: number, c1: number, r2: number, c2: number) {
+		const rs = Math.min(r1, r2);
+		const re = Math.max(r1, r2);
+		const cs = Math.min(c1, c2);
+		const ce = Math.max(c1, c2);
+
+		const a = refToStr(rs, cs);
+		const b = refToStr(re, ce);
+		return rs === re && cs === ce ? a : `${a}:${b}`;
+	}
+
+	// --- your existing handler, modified ----------------------------------------
 	function handleCellMouseDown(i: number, j: number, e: MouseEvent) {
-		let pos = new Position(i, j);
+		const pos = new Position(i, j);
 
 		if (grid.anyIsEditing()) {
-			// Get the actual input element that's being edited
 			const el = document.querySelector<HTMLInputElement>('input:focus');
 			const currentInputValue = el?.value ?? '';
 
-			// ONLY treat this as a reference insert if it's a formula
+			// Only treat as reference insert if we're editing a formula
 			if (currentInputValue.trim().startsWith('=')) {
-				// Prevent the input from losing focus
+				// Keep focus in the input
 				e.preventDefault();
 
-				// --- This is the same reference-inserting logic as before ---
-				const ref = refToStr(i, j);
+				// Enter "select range for formula" mode, but DO NOT insert yet.
+				selectingRangeForFormula = true;
+				dragging = true;
+
+				anchorRow = i;
+				anchorCol = j;
+				hoverRow = i;
+				hoverCol = j;
+
+				// remember the caret where we'll insert the reference on mouseup
 				if (el) {
-					const { selectionStart, selectionEnd } = el;
-					const before = el.value.slice(0, selectionStart ?? 0);
-					const after = el.value.slice(selectionEnd ?? 0);
-					el.value = before + ref + after;
-					const newPos = (selectionStart ?? 0) + ref.length;
-					el.setSelectionRange(newPos, newPos);
-					el.dispatchEvent(new Event('input', { bubbles: true }));
+					formulaCaretStart = el.selectionStart ?? el.value.length;
+					formulaCaretEnd = el.selectionEnd ?? el.value.length;
 					el.focus();
+				} else {
+					formulaCaretStart = formulaCaretEnd = null;
 				}
 
+				// visually highlight the starting cell
+				grid.setActive(new Position(anchorRow, anchorCol), new Position(anchorRow, anchorCol));
 				return;
 			}
 
+			// Not a formula; exit editing before doing a normal selection
 			grid.stopAnyEditing();
 		}
 
-		// We are not editing, so this is a normal cell selection OR this is not a formula
+		// Normal (non-formula) selection behavior
 		grid.setActive(pos, pos);
 		dragging = true;
 	}
 
 	onMount(() => {
 		const handler = (e: MouseEvent) => {
-			// optional: check if click target is outside grid container
+			// If click is outside the grid, cancel editing
 			if (!(e.target as HTMLElement).closest('.grid-wrapper')) {
 				grid.stopEditingActive();
+
+				// also reset any in-progress formula selection
+				selectingRangeForFormula = false;
+				dragging = false;
 			}
 		};
 
@@ -87,31 +120,55 @@
 			if (!dragging) return;
 
 			const el = document.elementFromPoint(e.clientX, e.clientY);
-
 			if (el && el instanceof HTMLElement && el.dataset.row && el.dataset.col) {
 				const row = parseInt(el.dataset.row, 10);
 				const col = parseInt(el.dataset.col, 10);
 
-				grid.setActive(grid.primary_active, new Position(row, col));
+				hoverRow = row;
+				hoverCol = col;
+
+				if (selectingRangeForFormula) {
+					// while dragging a formula range, keep the grid selection in sync
+					grid.setActive(new Position(anchorRow, anchorCol), new Position(row, col));
+				} else {
+					// normal drag-select
+					grid.setActive(grid.primary_active, new Position(row, col));
+				}
 			}
 		};
 
-		const handleMouseUp = (e: MouseEvent) => {
-			dragging = false; // stop tracking
-			//
-			// const el = document.elementFromPoint(e.clientX, e.clientY);
-			//
-			// if (el && el instanceof HTMLElement && el.dataset.row && el.dataset.col) {
-			// 	const row = parseInt(el.dataset.row, 10);
-			// 	const col = parseInt(el.dataset.col, 10);
-			//
-			// 	// expand selection as you drag
-			// 	let pos = new Position(row, col);
-			//
-			// 	if (grid.isActive(pos) && grid.isEditing(pos)) return;
-			//
-			// 	grid.stopAnyEditing();
-			// }
+		const handleMouseUp = () => {
+			// Commit the range to the formula input iff we were range-picking
+			if (selectingRangeForFormula) {
+				const input = document.querySelector<HTMLInputElement>('input:focus');
+
+				// Fallbacks in case caret wasn't captured (shouldn't happen if input stayed focused)
+				const start = formulaCaretStart ?? input?.value.length ?? 0;
+				const end = formulaCaretEnd ?? start;
+
+				const ref = rangeRef(anchorRow, anchorCol, hoverRow, hoverCol);
+
+				if (input) {
+					const before = input.value.slice(0, start);
+					const after = input.value.slice(end);
+					input.value = before + ref + after;
+
+					const newPos = start + ref.length;
+					input.setSelectionRange(newPos, newPos);
+					input.dispatchEvent(new Event('input', { bubbles: true }));
+					input.focus();
+				}
+
+				// Reset formula-range state but keep the user in edit mode
+				selectingRangeForFormula = false;
+				grid.clearActive();
+			}
+
+			dragging = false;
+
+			// clear transient state
+			anchorRow = anchorCol = hoverRow = hoverCol = -1;
+			formulaCaretStart = formulaCaretEnd = null;
 		};
 
 		window.addEventListener('click', handler);

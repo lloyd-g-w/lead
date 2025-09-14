@@ -111,6 +111,10 @@ class Grid {
 		};
 	}
 
+	public clearActive(){
+		this.setActive(null,null);
+	}
+
 	public getRowHeight(row: number) {
 		return this.row_heights[row] ?? this.default_row_height;
 	}
