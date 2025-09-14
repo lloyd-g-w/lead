@@ -119,7 +119,6 @@ fn evaluate_expr(
         }
         Expr::Group(g) => evaluate_expr(g, precs, grid)?,
         Expr::Function { name, args } => match name.as_str() {
-            // "AVG" => eval_avg(args, precs, grid)?,
             "AVG" => eval_numeric_func(
                 args,
                 precs,
@@ -128,9 +127,15 @@ fn evaluate_expr(
                     let mut res = 0.0;
                     let mut count = 0;
 
-                    for num in nums {
-                        res += num;
-                        count += 1;
+                    for eval in nums {
+                        match eval {
+                            Eval::Literal(Literal::Number(num)) => {
+                                res += num;
+                                count += 1;
+                            }
+                            Eval::Unset => {}
+                            _ => unreachable!(),
+                        }
                     }
 
                     if count == 0 {
@@ -144,7 +149,86 @@ fn evaluate_expr(
                     }
                 },
                 "AVG".into(),
-                Some(0f64),
+            )?,
+            "SUM" => eval_numeric_func(
+                args,
+                precs,
+                grid,
+                |nums| {
+                    Ok(nums
+                        .iter()
+                        .filter_map(|e| {
+                            if let Eval::Literal(Literal::Number(n)) = e {
+                                Some(n)
+                            } else {
+                                None
+                            }
+                        })
+                        .sum())
+                },
+                "SUM".into(),
+            )?,
+            "PROD" => eval_numeric_func(
+                args,
+                precs,
+                grid,
+                |nums| {
+                    Ok(nums
+                        .iter()
+                        .filter_map(|e| {
+                            if let Eval::Literal(Literal::Number(n)) = e {
+                                Some(n)
+                            } else {
+                                None
+                            }
+                        })
+                        .product())
+                },
+                "PROD".into(),
+            )?,
+            "MAX" => eval_numeric_func(
+                args,
+                precs,
+                grid,
+                |nums| {
+                    nums.iter()
+                        .filter_map(|e| {
+                            if let Eval::Literal(Literal::Number(n)) = e {
+                                Some(*n) // deref to f64
+                            } else {
+                                None
+                            }
+                        })
+                        .max_by(|a, b| a.partial_cmp(b).unwrap())
+                        .ok_or(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: "MAX on empty set.".into(),
+                            code: LeadErrCode::Unsupported,
+                        })
+                },
+                "MAX".into(),
+            )?,
+            "MIN" => eval_numeric_func(
+                args,
+                precs,
+                grid,
+                |nums| {
+                    nums.iter()
+                        .filter_map(|e| {
+                            if let Eval::Literal(Literal::Number(n)) = e {
+                                Some(*n) // deref to f64
+                            } else {
+                                None
+                            }
+                        })
+                        .min_by(|a, b| a.partial_cmp(b).unwrap())
+                        .ok_or(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: "MIN on empty set.".into(),
+                            code: LeadErrCode::Unsupported,
+                        })
+                },
+                "MIN".into(),
             )?,
             "EXP" => eval_single_arg_numeric(args, precs, grid, |x| x.exp(), "EXP".into())?,
             "SIN" => eval_single_arg_numeric(args, precs, grid, |x| x.sin(), "SIN".into())?,

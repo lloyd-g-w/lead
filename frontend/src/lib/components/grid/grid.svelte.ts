@@ -61,21 +61,21 @@ class Grid {
 
 	public setCell(pos: Position | null | undefined) {
 		if (pos === null || pos === undefined) return;
-		let data = this.data[pos.key()];
-		if (data === undefined) return;
+		let cell = this.data[pos.key()];
+		if (cell === undefined) return;
 
-		if (data.temp_raw === '') {
+		if (cell.temp_raw === '') {
 			delete this.data[pos.key()];
 			return;
 		}
 
-		data.raw = data.temp_raw;
-		data.eval = data.temp_eval;
+		cell.raw = cell.temp_raw;
+		cell.eval = cell.temp_eval;
 
 		let msg: LeadMsg = {
 			msg_type: 'set',
 			cell: pos.ref(),
-			raw: data.temp_raw
+			raw: cell.temp_raw
 		};
 
 		this.socket.send(JSON.stringify(msg));
@@ -178,7 +178,6 @@ class Grid {
 
 		let cell = this.getCell(pos);
 		if (!cell) return;
-		cell.temp_eval = undefined;
 	}
 
 	public stopEditing(pos: Position | null | undefined) {
