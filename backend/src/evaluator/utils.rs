@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, default};
 
 use crate::{
     cell::CellRef,
@@ -73,4 +73,68 @@ pub fn eval_n_arg_numeric(
     }
 
     Ok(Eval::Literal(Literal::Number(func(numbers))))
+}
+
+pub fn eval_numeric_func(
+    args: &Vec<Expr>,
+    precs: &mut HashSet<CellRef>,
+    grid: Option<&Grid>,
+    func: fn(Vec<f64>) -> Result<f64, LeadErr>,
+    func_name: String,
+    unset_val: Option<f64>,
+) -> Result<Eval, LeadErr> {
+    let mut numeric_args = Vec::new();
+
+    for arg in args {
+        match evaluate_expr(arg, precs, grid)? {
+            Eval::Literal(Literal::Number(num)) => {
+                numeric_args.push(num);
+            }
+            Eval::Range(range) => {
+                for cell in range {
+                    let Eval::CellRef { eval, reference: _ } = cell else {
+                        return Err(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: format!(
+                                "Found non-cellref in RANGE during {func_name} evaluation."
+                            ),
+                            code: LeadErrCode::Server,
+                        });
+                    };
+
+                    if let Eval::Literal(Literal::Number(num)) = *eval {
+                        numeric_args.push(num);
+                    } else if matches!(*eval, Eval::Unset) {
+                        if let Some(default) = unset_val {
+                            numeric_args.push(default);
+                        } else {
+                            return Err(LeadErr {
+                                title: "Evaluation error.".into(),
+                                desc: format!("{func_name} does not support unset cells."),
+                                code: LeadErrCode::Unsupported,
+                            });
+                        }
+                    } else {
+                        return Err(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: format!("Expected numeric types for {func_name} function."),
+                            code: LeadErrCode::Unsupported,
+                        });
+                    }
+                }
+            }
+            _ => {
+                return Err(LeadErr {
+                    title: "Evaluation error.".into(),
+                    desc: format!("Expected numeric types for {func_name} function."),
+                    code: LeadErrCode::Unsupported,
+                });
+            }
+        }
+    }
+
+    match func(numeric_args) {
+        Ok(res) => Ok(Eval::Literal(Literal::Number(res))),
+        Err(e) => Err(e),
+    }
 }

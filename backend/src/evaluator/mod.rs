@@ -119,7 +119,33 @@ fn evaluate_expr(
         }
         Expr::Group(g) => evaluate_expr(g, precs, grid)?,
         Expr::Function { name, args } => match name.as_str() {
-            "AVG" => eval_avg(args, precs, grid)?,
+            // "AVG" => eval_avg(args, precs, grid)?,
+            "AVG" => eval_numeric_func(
+                args,
+                precs,
+                grid,
+                |nums| {
+                    let mut res = 0.0;
+                    let mut count = 0;
+
+                    for num in nums {
+                        res += num;
+                        count += 1;
+                    }
+
+                    if count == 0 {
+                        Err(LeadErr {
+                            title: "Evaluation error.".into(),
+                            desc: "Attempted to divide by zero.".into(),
+                            code: LeadErrCode::DivZero,
+                        })
+                    } else {
+                        Ok(res / count as f64)
+                    }
+                },
+                "AVG".into(),
+                Some(0f64),
+            )?,
             "EXP" => eval_single_arg_numeric(args, precs, grid, |x| x.exp(), "EXP".into())?,
             "SIN" => eval_single_arg_numeric(args, precs, grid, |x| x.sin(), "SIN".into())?,
             "COS" => eval_single_arg_numeric(args, precs, grid, |x| x.cos(), "COS".into())?,
