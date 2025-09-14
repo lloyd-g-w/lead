@@ -3,13 +3,14 @@ use serde::{Deserialize, Serialize};
 use crate::{
     cell::CellRef,
     common::{LeadErr, LeadErrCode, Literal},
-    evaluator::utils::*,
+    evaluator::{numerics::*, utils::*},
     grid::Grid,
     parser::*,
 };
 
 use std::{collections::HashSet, f64, fmt};
 
+mod numerics;
 mod utils;
 
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
@@ -124,81 +125,29 @@ fn evaluate_expr(
                 precs,
                 grid,
                 |nums| {
-                    let mut res = 0.0;
-                    let mut count = 0;
-
-                    for eval in nums {
-                        match eval {
-                            Eval::Literal(Literal::Number(num)) => {
-                                res += num;
-                                count += 1;
-                            }
-                            Eval::Unset => {}
-                            _ => unreachable!(),
-                        }
-                    }
-
-                    if count == 0 {
+                    if nums.is_empty() {
                         Err(LeadErr {
                             title: "Evaluation error.".into(),
                             desc: "Attempted to divide by zero.".into(),
                             code: LeadErrCode::DivZero,
                         })
                     } else {
-                        Ok(res / count as f64)
+                        Ok(nums.iter().sum::<f64>() / nums.len() as f64)
                     }
                 },
-                "AVG".into(),
+                "AVG",
             )?,
-            "SUM" => eval_numeric_func(
-                args,
-                precs,
-                grid,
-                |nums| {
-                    Ok(nums
-                        .iter()
-                        .filter_map(|e| {
-                            if let Eval::Literal(Literal::Number(n)) = e {
-                                Some(n)
-                            } else {
-                                None
-                            }
-                        })
-                        .sum())
-                },
-                "SUM".into(),
-            )?,
-            "PROD" => eval_numeric_func(
-                args,
-                precs,
-                grid,
-                |nums| {
-                    Ok(nums
-                        .iter()
-                        .filter_map(|e| {
-                            if let Eval::Literal(Literal::Number(n)) = e {
-                                Some(n)
-                            } else {
-                                None
-                            }
-                        })
-                        .product())
-                },
-                "PROD".into(),
-            )?,
+            "SUM" => eval_numeric_func(args, precs, grid, |nums| Ok(nums.iter().sum()), "SUM")?,
+            "PROD" => {
+                eval_numeric_func(args, precs, grid, |nums| Ok(nums.iter().product()), "PROD")?
+            }
             "MAX" => eval_numeric_func(
                 args,
                 precs,
                 grid,
                 |nums| {
                     nums.iter()
-                        .filter_map(|e| {
-                            if let Eval::Literal(Literal::Number(n)) = e {
-                                Some(*n) // deref to f64
-                            } else {
-                                None
-                            }
-                        })
+                        .cloned()
                         .max_by(|a, b| a.partial_cmp(b).unwrap())
                         .ok_or(LeadErr {
                             title: "Evaluation error.".into(),
@@ -206,7 +155,7 @@ fn evaluate_expr(
                             code: LeadErrCode::Unsupported,
                         })
                 },
-                "MAX".into(),
+                "MAX",
             )?,
             "MIN" => eval_numeric_func(
                 args,
@@ -214,13 +163,7 @@ fn evaluate_expr(
                 grid,
                 |nums| {
                     nums.iter()
-                        .filter_map(|e| {
-                            if let Eval::Literal(Literal::Number(n)) = e {
-                                Some(*n) // deref to f64
-                            } else {
-                                None
-                            }
-                        })
+                        .cloned()
                         .min_by(|a, b| a.partial_cmp(b).unwrap())
                         .ok_or(LeadErr {
                             title: "Evaluation error.".into(),
@@ -228,17 +171,21 @@ fn evaluate_expr(
                             code: LeadErrCode::Unsupported,
                         })
                 },
-                "MIN".into(),
+                "MIN",
             )?,
-            "EXP" => eval_single_arg_numeric(args, precs, grid, |x| x.exp(), "EXP".into())?,
-            "SIN" => eval_single_arg_numeric(args, precs, grid, |x| x.sin(), "SIN".into())?,
-            "COS" => eval_single_arg_numeric(args, precs, grid, |x| x.cos(), "COS".into())?,
-            "TAN" => eval_single_arg_numeric(args, precs, grid, |x| x.tan(), "TAN".into())?,
-            "ASIN" => eval_single_arg_numeric(args, precs, grid, |x| x.asin(), "ASIN".into())?,
-            "ACOS" => eval_single_arg_numeric(args, precs, grid, |x| x.acos(), "ACOS".into())?,
-            "ATAN" => eval_single_arg_numeric(args, precs, grid, |x| x.atan(), "ATAN".into())?,
-            "PI" => eval_const(args, Eval::Literal(Literal::Number(f64::consts::PI)))?,
-            "TAU" => eval_const(args, Eval::Literal(Literal::Number(f64::consts::TAU)))?,
+            "ABS" => eval_abs(args, precs, grid)?,
+            "LOG" => eval_log(args, precs, grid)?,
+            "SQRT" => eval_sqrt(args, precs, grid)?,
+            "EXP" => eval_exp(args, precs, grid)?,
+            "SIN" => eval_sin(args, precs, grid)?,
+            "COS" => eval_cos(args, precs, grid)?,
+            "TAN" => eval_tan(args, precs, grid)?,
+            "ASIN" => eval_asin(args, precs, grid)?,
+            "ACOS" => eval_acos(args, precs, grid)?,
+            "ATAN" => eval_atan(args, precs, grid)?,
+            "PI" => eval_pi(args)?,
+            "TAU" => eval_tau(args)?,
+            "SQRT2" => eval_sqrt2(args)?,
             it => {
                 return Err(LeadErr {
                     title: "Evaluation error.".into(),
@@ -317,77 +264,6 @@ fn eval_range(
             code: LeadErrCode::Unsupported,
         }),
     }
-}
-
-fn eval_avg(
-    args: &Vec<Expr>,
-    precs: &mut HashSet<CellRef>,
-    grid: Option<&Grid>,
-) -> Result<Eval, LeadErr> {
-    let mut res = 0.0;
-    let mut count = 0;
-
-    for arg in args {
-        match evaluate_expr(arg, precs, grid)? {
-            Eval::Literal(Literal::Number(num)) => {
-                res += num;
-                count += 1;
-            }
-            Eval::Range(range) => {
-                for cell in range {
-                    let Eval::CellRef { eval, reference: _ } = cell else {
-                        return Err(LeadErr {
-                            title: "Evaluation error.".into(),
-                            desc: "Found non-cellref in RANGE during AVG evaluation.".into(),
-                            code: LeadErrCode::Server,
-                        });
-                    };
-
-                    if let Eval::Literal(Literal::Number(num)) = *eval {
-                        res += num;
-                        count += 1;
-                    } else if matches!(*eval, Eval::Unset) {
-                        continue;
-                    } else {
-                        return Err(LeadErr {
-                            title: "Evaluation error.".into(),
-                            desc: "Expected numeric types for AVG function.".into(),
-                            code: LeadErrCode::Unsupported,
-                        });
-                    }
-                }
-            }
-            _ => {
-                return Err(LeadErr {
-                    title: "Evaluation error.".into(),
-                    desc: "Expected numeric types for AVG function.".into(),
-                    code: LeadErrCode::Unsupported,
-                });
-            }
-        }
-    }
-
-    if count == 0 {
-        Err(LeadErr {
-            title: "Evaluation error.".into(),
-            desc: "Attempted to divide by zero.".into(),
-            code: LeadErrCode::DivZero,
-        })
-    } else {
-        Ok(Eval::Literal(Literal::Number(res / count as f64)))
-    }
-}
-
-fn eval_const(args: &Vec<Expr>, value: Eval) -> Result<Eval, LeadErr> {
-    if args.len() != 0 {
-        return Err(LeadErr {
-            title: "Evaluation error.".into(),
-            desc: format!("PI function requires no arguments."),
-            code: LeadErrCode::Invalid,
-        });
-    }
-
-    Ok(value)
 }
 
 fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {
