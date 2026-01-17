@@ -5,7 +5,7 @@ use log::info;
 use crate::{
     cell::{Cell, CellRef},
     common::{LeadErr, LeadErrCode, Literal},
-    evaluator::{Eval, evaluate},
+    evaluator::{Eval, evaluate, evaluate_literal},
 };
 
 pub struct Grid {
@@ -33,7 +33,7 @@ impl Grid {
         let mut updated_cells = vec![cell_ref];
 
         if raw_val.chars().nth(0) != Some('=') {
-            eval = Eval::Literal(Literal::String(raw_val.to_owned()));
+            eval = evaluate_literal(raw_val.to_owned());
         } else {
             // Evaluate raw expr and get precedents
             let (res_eval, res_precs) = evaluate(raw_val[1..].to_owned(), Some(&self));

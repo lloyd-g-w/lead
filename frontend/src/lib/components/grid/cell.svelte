@@ -12,18 +12,18 @@
 		grid
 	}: {
 		cla?: string;
-		width?: string;
-		height?: string;
+		width?: number;
+		height?: number;
 		grid: Grid;
 		pos: Position;
 		onmousedown?: (e: MouseEvent) => void;
 	} = $props();
 
 	let cell = $derived(grid.getCell(pos));
-	let active = $derived(grid.isActive(pos));
-	let primaryactive = $derived(grid.isPrimaryActive(pos));
-	let editing = $derived(grid.isEditing(pos));
-	let externalediting = $derived(grid.isExternalEditing(pos));
+	// let active = $derived(grid.isActive(pos));
+	// let primaryactive = $derived(grid.isPrimaryActive(pos));
+	// let editing = $derived(grid.isEditing(pos));
+	// let externalediting = $derived(grid.isExternalEditing(pos));
 	let width = $derived(grid.getColWidth(pos.col));
 	let height = $derived(grid.getRowHeight(pos.row));
 	let showPreview = $derived(getPreview() !== '');
@@ -56,7 +56,7 @@
 	}
 </script>
 
-{#if editing}
+{#if false}
 	<div class="relative inline-block">
 		{#if showPreview}
 			<h3
@@ -98,24 +98,16 @@
 
 {#snippet InnerCell()}
 	<div
-		ondblclick={() => grid.startEditing(pos)}
+		ondblclick={() => {}}
 		{onmousedown}
 		data-row={pos.row}
 		data-col={pos.col}
 		ondragstart={(e) => e.preventDefault()}
-		style:width
-		style:height
+		style:width={width + 'px'}
+		style:height={height + 'px'}
 		class={clsx(
 			'placeholder bg-background p-1',
-			{
-				primaryactive,
-				active,
-				'active-top': grid.isActiveTop(pos),
-				'active-bottom': grid.isActiveBottom(pos),
-				'active-right': grid.isActiveRight(pos),
-				'active-left': grid.isActiveLeft(pos),
-				'only-active': grid.isActive(pos) && grid.isSingleActive()
-			},
+
 			cla
 		)}
 	>
@@ -125,13 +117,13 @@
 					err: isErr(cell.eval)
 				})}
 			>
-				{#if externalediting}
-					{cell.temp_raw}
-				{:else if cell.eval}
-					{getEvalLiteral(cell.eval)}
-				{:else}
-					{cell.raw}
-				{/if}
+				<!-- {#if externalediting} -->
+				<!-- 	{cell.temp_raw} -->
+				<!-- {:else if cell.eval} -->
+				<!-- 	{getEvalLiteral(cell.eval)} -->
+				<!-- {:else} -->
+				<!-- 	{cell.raw} -->
+				<!-- {/if} -->
 			</span>
 		{/if}
 	</div>

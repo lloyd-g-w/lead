@@ -6,6 +6,7 @@ use crate::{
     evaluator::{numerics::*, utils::*},
     grid::Grid,
     parser::*,
+    tokenizer::{Token, Tokenizer},
 };
 
 use std::{collections::HashSet, f64, fmt};
@@ -46,6 +47,27 @@ pub fn evaluate(str: String, grid: Option<&Grid>) -> (Eval, HashSet<CellRef>) {
             }
         }
         Err(e) => (Eval::Err(e), HashSet::new()),
+    }
+}
+
+pub fn evaluate_literal(input: String) -> Eval {
+    let mut tokenizer = match Tokenizer::new(&input) {
+        Ok(t) => t,
+        Err(_) => {
+            return Eval::Literal(Literal::String(input.to_owned()));
+        }
+    };
+
+    if tokenizer.len() != 1 {
+        return Eval::Literal(Literal::String(input.to_owned()));
+    }
+
+    match tokenizer.next() {
+        Token::Literal(lit) => match lit {
+            Literal::Number(_) | Literal::String(_) => Eval::Literal(lit),
+            Literal::Boolean(_) => Eval::Literal(Literal::String(input.to_owned())),
+        },
+        _ => Eval::Literal(Literal::String(input.to_owned())),
     }
 }
 
@@ -265,7 +287,6 @@ fn eval_range(
         }),
     }
 }
-
 
 fn eval_pos(val: &Eval) -> Result<Eval, LeadErr> {
     match val {

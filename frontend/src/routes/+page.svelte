@@ -31,9 +31,3 @@
 		</div>
 	</div>
 </div>
-
-<style>
-	.grid-wrapper {
-		/* border-top: 2px solid var(--color-input); */
-	}
-</style>

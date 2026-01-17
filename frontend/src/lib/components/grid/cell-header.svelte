@@ -2,8 +2,8 @@
 	import clsx from 'clsx';
 
 	let {
-		width = '80px',
-		height = '30px',
+		width = 80,
+		height = 30,
 		setColWidth = () => {},
 		setRowHeight = () => {},
 		val,
@@ -11,10 +11,10 @@
 		direction = 'col', // New prop: 'col' for right-side drag, 'row' for bottom-side
 		resizeable = true
 	}: {
-		width?: string;
-		height?: string;
-		setColWidth?: (width: string) => void;
-		setRowHeight?: (height: string) => void;
+		width?: number;
+		height?: number;
+		setColWidth?: (width: number) => void;
+		setRowHeight?: (height: number) => void;
 		val: string;
 		active: boolean;
 		resizeable?: boolean;
@@ -39,11 +39,11 @@
 			if (direction === 'col') {
 				const dx = moveEvent.clientX - startX;
 				// Enforce a minimum width of 40px
-				setColWidth(`${Math.max(40, startWidth + dx)}px`);
+				setColWidth(Math.max(40, startWidth + dx));
 			} else {
 				const dy = moveEvent.clientY - startY;
 				// Enforce a minimum height of 20px
-				setRowHeight(`${Math.max(30, startHeight + dy)}px`);
+				setRowHeight(Math.max(30, startHeight + dy));
 			}
 		};
 
@@ -60,14 +60,17 @@
 </script>
 
 <div
-	style:width
-	style:height
-	class={clsx('placeholder group relative bg-background p-1', {
-		active,
-		col: direction === 'col',
-		row: direction === 'row',
-		blank: direction === 'blank'
-	})}
+	style:width={width + 'px'}
+	style:height={height + 'px'}
+	class={clsx(
+		'placeholder group relative bg-background p-1',
+		{
+			col: direction === 'col',
+			row: direction === 'row',
+			blank: direction === 'blank'
+		},
+		{ 'bg-primary/70! font-bold': active }
+	)}
 >
 	<span class="pointer-events-none flex h-full w-full items-center justify-center select-none">
 		{val}
@@ -88,7 +91,7 @@
 
 <style>
 	.placeholder {
-		font-size: 14px;
+		font-size: 12px;
 		border: 1px solid var(--input);
 		background-color: var(--color-background);
 	}
@@ -106,12 +109,6 @@
 	/* .placeholder.col { */
 	/* 	border-top: none; */
 	/* } */
-
-	.active {
-		background-color: color-mix(in oklab, var(--color-primary) 80%, var(--color-background) 80%);
-		font-weight: bold;
-		/* border: 1px solid var(--color-primary); */
-	}
 
 	/* --- Resizer Styles --- */
 	.resizer {

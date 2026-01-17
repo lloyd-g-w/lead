@@ -124,6 +124,10 @@ impl Tokenizer {
     pub fn peek(&mut self) -> Token {
         self.tokens.last().cloned().unwrap_or(Token::Eof)
     }
+
+    pub fn len(&self) -> usize {
+        self.tokens.len()
+    }
 }
 
 #[cfg(test)]
