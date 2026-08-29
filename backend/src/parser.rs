@@ -166,6 +166,15 @@ pub fn parse(input: &str) -> Result<(Expr, HashSet<CellRef>), LeadErr> {
     let mut tokenizer = Tokenizer::new(input)?;
     let mut precs = HashSet::new();
     let expr = _parse(&mut tokenizer, 0, &mut precs)?;
+
+    if tokenizer.peek() != Token::Eof {
+        return Err(LeadErr {
+            title: "Parse error.".into(),
+            desc: format!("Unexpected trailing token {:?}.", tokenizer.peek()),
+            code: LeadErrCode::Syntax,
+        });
+    }
+
     info!("{}", expr.pretty());
     Ok((expr, precs))
 }
@@ -262,7 +271,7 @@ pub fn _parse(
     // In the reference article this is a loop with match
     // statement that breaks on Eof and closing paren but this is simpler and works as expected
     while let Token::Operator(op) = input.peek() {
-        if OPERATORS_STR.contains(op) {
+        if op != '%' && OPERATORS_STR.contains(op) {
             let infix_op = match op {
                 '+' => InfixOp::ADD,
                 '-' => InfixOp::SUB,

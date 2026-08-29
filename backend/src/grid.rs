@@ -228,9 +228,15 @@ impl Grid {
             }
         }
 
+        let existing_deps = self
+            .cells
+            .get(&cell_ref)
+            .map(|c| c.deps())
+            .unwrap_or_default();
+
         self.cells.insert(
             cell_ref,
-            Cell::new_all(cell_ref, eval, raw, precs, HashSet::new()),
+            Cell::new_all(cell_ref, eval, raw, precs, existing_deps),
         );
     }
 

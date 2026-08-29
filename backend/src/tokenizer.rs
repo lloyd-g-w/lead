@@ -58,17 +58,45 @@ impl Tokenizer {
                         is_decimal = true;
                         number.push(ch);
                         chars.next();
-                    } else if ch == 'e' && !is_decimal && !is_exp {
-                        is_exp = true;
-                        number.push(ch);
-                        chars.next();
+                    } else if ch == 'e' && !is_exp {
+                        // Only consume 'e' as an exponent marker if it is followed by
+                        // digits, or a sign then digits; otherwise leave it for the
+                        // tokenizer to treat as a separate identifier/operator.
+                        let mut lookahead = chars.clone();
+                        lookahead.next(); // consume 'e' in the lookahead clone
+                        let mut has_sign = false;
+                        if matches!(lookahead.peek(), Some('+') | Some('-')) {
+                            has_sign = true;
+                            lookahead.next();
+                        }
+                        if matches!(lookahead.peek(), Some(d) if d.is_ascii_digit()) {
+                            is_exp = true;
+                            number.push(ch);
+                            chars.next();
+                            if has_sign {
+                                if let Some(&sign) = chars.peek() {
+                                    number.push(sign);
+                                    chars.next();
+                                }
+                            }
+                        } else {
+                            break;
+                        }
                     } else {
                         break;
                     }
                 }
 
-                // TODO: REMOVE UNWRAP
-                tokens.push(Token::Literal(Literal::Number(number.parse().unwrap())));
+                match number.parse() {
+                    Ok(n) => tokens.push(Token::Literal(Literal::Number(n))),
+                    Err(_) => {
+                        return Err(LeadErr {
+                            title: "Tokenizer error.".into(),
+                            desc: format!("Invalid numeric literal: {number}"),
+                            code: LeadErrCode::Syntax,
+                        });
+                    }
+                }
             } else if c == '"' || c == '\'' {
                 // parse string literal
                 let mut string = String::new();

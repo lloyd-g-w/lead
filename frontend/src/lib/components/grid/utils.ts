@@ -7,7 +7,8 @@ export function refFromStr(ref: string): CellRef {
 	const match = ref.match(/^([A-Z]+)([0-9]+)$/i);
 	if (!match) throw new Error('Invalid reference');
 
-	const [, letters, rowStr] = match;
+	const [, lettersRaw, rowStr] = match;
+	const letters = lettersRaw.toUpperCase();
 
 	let col = 0;
 	for (let i = 0; i < letters.length; i++) {
@@ -15,6 +16,7 @@ export function refFromStr(ref: string): CellRef {
 	}
 
 	const row = parseInt(rowStr, 10);
+	if (row < 1) throw new Error('Invalid reference');
 	return { row: row - 1, col: col - 1 };
 }
 
@@ -49,8 +51,8 @@ export function getEvalLiteral(value: Eval | undefined): LiteralValue {
 	}
 	if ('cellref' in value) return getEvalLiteral(value.cellref.eval);
 	if ('err' in value) return `#${value.err.code.toUpperCase()}`;
-	// if ('range' in value) return 'err';
-	return 'todo!';
+	if ('range' in value) return value.range.map((v) => getEvalLiteral(v)).join(', ');
+	return '';
 }
 
 export function isErr(value: Eval | undefined): boolean {

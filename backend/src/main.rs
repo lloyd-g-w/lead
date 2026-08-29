@@ -7,7 +7,7 @@ mod parser;
 mod tokenizer;
 
 use futures_util::{SinkExt, StreamExt, TryStreamExt};
-use log::info;
+use log::{info, warn};
 use std::{env, io::Error};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -37,14 +37,22 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn accept_connection(stream: TcpStream) {
-    let addr = stream
-        .peer_addr()
-        .expect("connected streams should have a peer address");
+    let addr = match stream.peer_addr() {
+        Ok(addr) => addr,
+        Err(e) => {
+            warn!("Connected stream had no peer address: {e}");
+            return;
+        }
+    };
     info!("Peer address: {}", addr);
 
-    let ws_stream = tokio_tungstenite::accept_async(stream)
-        .await
-        .expect("Error during the websocket handshake occurred");
+    let ws_stream = match tokio_tungstenite::accept_async(stream).await {
+        Ok(ws_stream) => ws_stream,
+        Err(e) => {
+            warn!("Error during the websocket handshake with {addr}: {e}");
+            return;
+        }
+    };
 
     info!("New WebSocket connection: {}", addr);
 

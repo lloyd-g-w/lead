@@ -18,7 +18,7 @@
 <Sidebar.Provider>
 	<LeadSidebar />
 
-	<main>
+	<main class="min-w-0 flex-1">
 		{@render children?.()}
 	</main>
 </Sidebar.Provider>

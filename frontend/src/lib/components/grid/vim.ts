@@ -76,6 +76,16 @@ export function getVimId(): string {
 }
 
 export function vimNormalModeKeyboardHandler(e: KeyboardEvent): void {
+	// Don't hijack browser shortcuts or typing in editable elements
+	// (e.g. the formula input); insert mode has its own handler.
+	if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+	const target = e.target;
+	if (target instanceof HTMLElement) {
+		const tag = target.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
+	}
+
 	const motionMap: Record<string, VimMotion> = {
 		h: 'left',
 		j: 'down',

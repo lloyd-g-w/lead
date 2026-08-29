@@ -29,7 +29,7 @@ interface EvalCellRef {
 }
 
 interface LeadErr {
-	code: 'DivZero' | 'TypeErr' | 'Syntax' | 'Server' | 'Unsupported';
+	code: 'DivZero' | 'TypeErr' | 'Syntax' | 'Server' | 'Unsupported' | 'Invalid' | 'Ref';
 	desc: string;
 	title: string;
 }
@@ -43,7 +43,7 @@ interface EvalConfig {
 type Eval =
 	| { literal: Literal }
 	| { cellref: EvalCellRef }
-	| { range: Range }
+	| { range: EvalRange }
 	| { err: LeadErr }
 	| 'unset';
 

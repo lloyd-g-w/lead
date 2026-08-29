@@ -234,4 +234,35 @@ pub fn eval_add(lval: &Eval, rval: &Eval) -> Result<Eval, LeadErr> {
 
 infix!(eval_sub, |x, y| x - y, "SUB");
 infix!(eval_mul, |x, y| x * y, "MUL");
-infix!(eval_div, |x, y| x / y, "DIV");
+
+fn eval_numeric_operand(val: &Eval, func_name: &str) -> Result<f64, LeadErr> {
+    let err = LeadErr {
+        title: "Evaluation error.".into(),
+        desc: format!("{func_name} function requires a numeric argument."),
+        code: LeadErrCode::TypeErr,
+    };
+
+    match val.to_owned() {
+        Eval::Literal(Literal::Number(num)) => Ok(num),
+        Eval::CellRef { eval, .. } => match *eval {
+            Eval::Literal(Literal::Number(num)) => Ok(num),
+            _ => Err(err),
+        },
+        _ => Err(err),
+    }
+}
+
+pub fn eval_div(lhs: &Eval, rhs: &Eval) -> Result<Eval, LeadErr> {
+    let l = eval_numeric_operand(lhs, "DIV")?;
+    let r = eval_numeric_operand(rhs, "DIV")?;
+
+    if r == 0.0 {
+        return Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: "Attempted to divide by zero.".into(),
+            code: LeadErrCode::DivZero,
+        });
+    }
+
+    Ok(Eval::Literal(Literal::Number(l / r)))
+}

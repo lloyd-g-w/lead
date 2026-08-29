@@ -125,7 +125,7 @@ impl CellRef {
         if row_part.is_empty() {
             return Err(LeadErr {
                 title: "Parse error.".into(),
-                desc: format!("Missing column letters in cell ref: {s}."),
+                desc: format!("Missing row number in cell ref: {s}."),
                 code: LeadErrCode::Syntax,
             });
         } else if !row_part.chars().all(|c| c.is_ascii_digit()) {
@@ -137,6 +137,14 @@ impl CellRef {
         }
 
         if let Ok(row) = row_part.parse::<usize>() {
+            if row < 1 {
+                return Err(LeadErr {
+                    title: "Parse error.".into(),
+                    desc: format!("Row number must be at least 1 in cell ref: {s}."),
+                    code: LeadErrCode::Syntax,
+                });
+            }
+
             Ok(CellRef {
                 row: row - 1,
                 col: col - 1,
