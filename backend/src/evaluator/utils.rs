@@ -64,6 +64,17 @@ pub fn eval_numeric_func(
         match eval {
             Eval::Literal(Literal::Number(n)) => numbers.push(n),
             Eval::Unset => {} // skip
+            Eval::CellRef { eval: boxed, .. } => match *boxed {
+                Eval::Literal(Literal::Number(n)) => numbers.push(n),
+                Eval::Unset => {} // skip
+                _ => {
+                    return Err(LeadErr {
+                        title: "Evaluation error.".into(),
+                        desc: format!("Expected numeric types for {func_name} function."),
+                        code: LeadErrCode::Unsupported,
+                    });
+                }
+            },
             Eval::Range(range) => {
                 for cell in range {
                     match cell {

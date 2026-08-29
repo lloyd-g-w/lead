@@ -30,9 +30,14 @@ impl Default for EvalConfig {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LeadMsg {
     pub msg_type: MsgType,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cell: Option<CellRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub raw: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub eval: Option<Eval>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub eval_config: Option<EvalConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bulk_msgs: Option<Vec<LeadMsg>>,
 }

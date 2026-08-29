@@ -58,6 +58,21 @@ pub fn evaluate_literal(input: String) -> Eval {
         }
     };
 
+    if tokenizer.len() == 2 {
+        // Allow a leading sign directly on a raw numeric literal, e.g. "-5" or "+5".
+        if let Token::Operator(sign @ ('-' | '+')) = tokenizer.peek() {
+            let mut lookahead = Tokenizer {
+                tokens: tokenizer.tokens.clone(),
+            };
+            lookahead.next();
+            if let Token::Literal(Literal::Number(n)) = lookahead.next() {
+                let value = if sign == '-' { -n } else { n };
+                return Eval::Literal(Literal::Number(value));
+            }
+        }
+        return Eval::Literal(Literal::String(input.to_owned()));
+    }
+
     if tokenizer.len() != 1 {
         return Eval::Literal(Literal::String(input.to_owned()));
     }
@@ -169,14 +184,14 @@ fn evaluate_expr(
                 precs,
                 grid,
                 |nums| {
-                    nums.iter()
-                        .cloned()
-                        .max_by(|a, b| a.partial_cmp(b).unwrap())
-                        .ok_or(LeadErr {
+                    if nums.is_empty() {
+                        return Err(LeadErr {
                             title: "Evaluation error.".into(),
                             desc: "MAX on empty set.".into(),
                             code: LeadErrCode::Unsupported,
-                        })
+                        });
+                    }
+                    Ok(nums.iter().cloned().fold(f64::NEG_INFINITY, f64::max))
                 },
                 "MAX",
             )?,
@@ -185,14 +200,14 @@ fn evaluate_expr(
                 precs,
                 grid,
                 |nums| {
-                    nums.iter()
-                        .cloned()
-                        .min_by(|a, b| a.partial_cmp(b).unwrap())
-                        .ok_or(LeadErr {
+                    if nums.is_empty() {
+                        return Err(LeadErr {
                             title: "Evaluation error.".into(),
                             desc: "MIN on empty set.".into(),
                             code: LeadErrCode::Unsupported,
-                        })
+                        });
+                    }
+                    Ok(nums.iter().cloned().fold(f64::INFINITY, f64::min))
                 },
                 "MIN",
             )?,
@@ -253,6 +268,17 @@ fn eval_range(
             let row_end = a_ref.row.max(b_ref.row);
             let col_start = a_ref.col.min(b_ref.col);
             let col_end = a_ref.col.max(b_ref.col);
+
+            const MAX_RANGE_CELLS: usize = 100_000;
+            let row_count = row_end - row_start + 1;
+            let col_count = col_end - col_start + 1;
+            if row_count.saturating_mul(col_count) > MAX_RANGE_CELLS {
+                return Err(LeadErr {
+                    title: "Evaluation error.".into(),
+                    desc: format!("Range exceeds maximum size of {MAX_RANGE_CELLS} cells."),
+                    code: LeadErrCode::Unsupported,
+                });
+            }
 
             for row in row_start..=row_end {
                 for col in col_start..=col_end {

@@ -8,7 +8,7 @@
 	import type { CellT, LeadMsg } from './messages';
 import { Grid, Position } from './grid.svelte.ts';
 import { GridSelection } from './grid-selection.svelte';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { GRID_MODE_LABELS, InsertMode, NormalMode, VisualMode } from './grid-mode.svelte.ts';
 	import ContextMenuSubTrigger from '../ui/context-menu/context-menu-sub-trigger.svelte';
 
@@ -35,6 +35,12 @@ import { GridSelection } from './grid-selection.svelte';
 
 	onMount(() => {
 		grid.init();
+	});
+
+	// The active mode owns a window keydown listener, a vim listener
+	// registration and the selection's MutationObserver — release them on unmount.
+	onDestroy(() => {
+		grid.mode.destroy();
 	});
 
 	let rows = 100;

@@ -1,6 +1,10 @@
 import { Position } from './position.svelte';
 import type { VimModifier } from './vim';
 
+// Matches the rendered grid bounds in grid.svelte (rows/cols).
+const MAX_ROW = 99;
+const MAX_COL = 49;
+
 export class GridSelection {
 	#initialised: boolean = false;
 
@@ -198,7 +202,10 @@ export class GridSelection {
 	}
 
 	public expandDown(amount: VimModifier = 1) {
-		return new GridSelection(this.#p1, new Position(this.#p2.row + amount, this.#p2.col));
+		return new GridSelection(
+			this.#p1,
+			new Position(Math.min(MAX_ROW, this.#p2.row + amount), this.#p2.col)
+		);
 	}
 
 	public expandLeft(amount: VimModifier = 1) {
@@ -209,7 +216,10 @@ export class GridSelection {
 	}
 
 	public expandRight(amount: VimModifier = 1) {
-		return new GridSelection(this.#p1, new Position(this.#p2.row, this.#p2.col + amount));
+		return new GridSelection(
+			this.#p1,
+			new Position(this.#p2.row, Math.min(MAX_COL, this.#p2.col + amount))
+		);
 	}
 
 	public shiftStart() {
@@ -229,8 +239,8 @@ export class GridSelection {
 
 	public shiftDown(amount: VimModifier = 1) {
 		return new GridSelection(
-			new Position(this.#p1.row + amount, this.#p1.col),
-			new Position(this.#p2.row + amount, this.#p2.col)
+			new Position(Math.min(MAX_ROW, this.#p1.row + amount), this.#p1.col),
+			new Position(Math.min(MAX_ROW, this.#p2.row + amount), this.#p2.col)
 		);
 	}
 
@@ -243,8 +253,8 @@ export class GridSelection {
 
 	public shiftRight(amount: VimModifier = 1) {
 		return new GridSelection(
-			new Position(this.#p1.row, this.#p1.col + amount),
-			new Position(this.#p2.row, this.#p2.col + amount)
+			new Position(this.#p1.row, Math.min(MAX_COL, this.#p1.col + amount)),
+			new Position(this.#p2.row, Math.min(MAX_COL, this.#p2.col + amount))
 		);
 	}
 

@@ -103,6 +103,8 @@ export class NormalMode extends GridMode implements VimListener {
 		const shift = (key: string) => {
 			const fn = shiftMap[key];
 			if (fn) {
+				// Disconnect the old selection's observer before replacing it.
+				this.#selection.destroy();
 				fn();
 				this.#selection.init();
 			}
@@ -127,8 +129,10 @@ export class NormalMode extends GridMode implements VimListener {
 
 			case 'goto':
 				if (command.motion === 'top') {
+					this.#selection.destroy();
 					(this.#selection = this.#selection.shiftTop()).init();
 				} else if (command.motion === 'start') {
+					this.#selection.destroy();
 					(this.#selection = this.#selection.shiftStart()).init();
 				}
 				break;
@@ -200,6 +204,8 @@ export class VisualMode extends GridMode implements VimListener {
 		const expand = (key: string) => {
 			const fn = expandMap[key];
 			if (fn) {
+				// Disconnect the old selection's observer before replacing it.
+				this.#selection.destroy();
 				fn();
 				this.#selection.init();
 			}
@@ -220,8 +226,10 @@ export class VisualMode extends GridMode implements VimListener {
 
 			case 'goto':
 				if (command.motion === 'top') {
+					this.#selection.destroy();
 					(this.#selection = this.#selection.expandTop()).init();
 				} else if (command.motion === 'start') {
+					this.#selection.destroy();
 					(this.#selection = this.#selection.expandStart()).init();
 				}
 				return;
