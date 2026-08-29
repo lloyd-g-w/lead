@@ -7,6 +7,8 @@
 	const sidebar = useSidebar();
 
 	let socket = new WebSocket('ws://localhost:7050');
+
+	let gridWrapper: HTMLDivElement | undefined = $state();
 </script>
 
 {#if sidebar?.openMobile || sidebar?.open}
@@ -26,8 +28,8 @@
 			</div>
 		</div>
 
-		<div class="grid-wrapper min-h-0 w-full flex-1">
-			<Grid class="h-full min-w-0" {socket} />
+		<div class="grid-wrapper min-h-0 w-[99dvw] flex-1" bind:this={gridWrapper}>
+			<Grid class="h-full min-w-0" {socket} bind:wrapperEl={gridWrapper} />
 		</div>
 	</div>
 </div>

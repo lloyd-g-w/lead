@@ -106,6 +106,62 @@ unary_func!(eval_atan, |x| x.atan(), "ATAN");
 
 // -------------------------------------------------- //
 
+fn eval_binary(
+    args: &Vec<Expr>,
+    precs: &mut HashSet<CellRef>,
+    grid: Option<&Grid>,
+    func: fn(f64, f64) -> f64,
+    func_name: &str,
+) -> Result<Eval, LeadErr> {
+    if args.len() != 2 {
+        return Err(LeadErr {
+            title: "Evaluation error.".into(),
+            desc: format!("{func_name} function requires two arguments."),
+            code: LeadErrCode::Invalid,
+        });
+    }
+    let err = LeadErr {
+        title: "Evaluation error.".into(),
+        desc: format!("{func_name} function requires a numeric argument."),
+        code: LeadErrCode::TypeErr,
+    };
+    let first = match evaluate_expr(&args[0], precs, grid)? {
+        Eval::Literal(Literal::Number(num)) => num,
+        Eval::CellRef { eval, .. } => match *eval {
+            Eval::Literal(Literal::Number(n)) => n,
+            _ => return Err(err),
+        },
+        _ => return Err(err),
+    };
+
+    let second = match evaluate_expr(&args[1], precs, grid)? {
+        Eval::Literal(Literal::Number(num)) => num,
+        Eval::CellRef { eval, .. } => match *eval {
+            Eval::Literal(Literal::Number(n)) => n,
+            _ => return Err(err),
+        },
+        _ => return Err(err),
+    };
+
+    Ok(Eval::Literal(Literal::Number(func(first, second))))
+}
+
+macro_rules! binary_func {
+    ($fn_name:ident, $func:expr, $label:expr) => {
+        pub fn $fn_name(
+            args: &Vec<Expr>,
+            precs: &mut HashSet<CellRef>,
+            grid: Option<&Grid>,
+        ) -> Result<Eval, LeadErr> {
+            eval_binary(args, precs, grid, $func, $label)
+        }
+    };
+}
+
+binary_func!(eval_pow, |x, y| x.powf(y), "POW");
+
+// -------------------------------------------------- //
+
 fn eval_infix(
     lhs: &Eval,
     rhs: &Eval,

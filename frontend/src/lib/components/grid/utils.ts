@@ -75,3 +75,23 @@ export function getErrDesc(value: Eval | undefined): string {
 	if (!('err' in value)) return '';
 	return value.err.desc;
 }
+
+export function handleInputFocus(e: FocusEvent) {
+	const element = e.currentTarget;
+	if (!(element instanceof HTMLElement)) return;
+
+	// Create a range and selection to move the cursor
+	const range = document.createRange();
+	const selection = window.getSelection();
+
+	if (!selection) return;
+
+	// Target all content inside the div
+	range.selectNodeContents(element);
+	// Collapse the range to the end (false = end, true = start)
+	range.collapse(false);
+
+	// Clear any existing selections and apply the new range
+	selection.removeAllRanges();
+	selection.addRange(range);
+}

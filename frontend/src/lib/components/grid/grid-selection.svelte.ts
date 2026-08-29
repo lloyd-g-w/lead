@@ -2,6 +2,8 @@ import { Position } from './position.svelte';
 import type { VimModifier } from './vim';
 
 export class GridSelection {
+	#initialised: boolean = false;
+
 	#p1: Position; // This is the position that initated the selection
 	#p2: Position; // This is the position that ended the selection
 
@@ -76,6 +78,7 @@ export class GridSelection {
 
 	// For dom-related initialization
 	public init() {
+		this.#initialised = true;
 		this.#updatePxDimensions();
 
 		this.#observer = new MutationObserver(() => {
@@ -174,6 +177,19 @@ export class GridSelection {
 		return this.#tl.equals(this.#br);
 	}
 
+	public expandStart() {
+		return new GridSelection(
+			this.#p1, new Position(this.#p2.row, 0)
+		);
+	}
+
+	public expandTop() {
+		return new GridSelection(
+			new Position(this.#p1.row, this.#p1.col),
+			new Position(0, this.#p2.col)
+		);
+	}
+
 	public expandUp(amount: VimModifier = 1) {
 		return new GridSelection(
 			this.#p1,
@@ -194,6 +210,14 @@ export class GridSelection {
 
 	public expandRight(amount: VimModifier = 1) {
 		return new GridSelection(this.#p1, new Position(this.#p2.row, this.#p2.col + amount));
+	}
+
+	public shiftStart() {
+		return new GridSelection(new Position(this.#p1.row, 0), new Position(this.#p2.row, 0));
+	}
+
+	public shiftTop() {
+		return new GridSelection(new Position(0, this.#p1.col), new Position(0, this.#p2.col));
 	}
 
 	public shiftUp(amount: VimModifier = 1) {
@@ -222,5 +246,20 @@ export class GridSelection {
 			new Position(this.#p1.row, this.#p1.col + amount),
 			new Position(this.#p2.row, this.#p2.col + amount)
 		);
+	}
+
+	public forEach(cb: (pos: Position) => void) {
+		for (let r = this.#tl.row; r <= this.#br.row; r++) {
+			for (let c = this.#tl.col; c <= this.#br.col; c++) {
+				cb(new Position(r, c));
+			}
+		}
+	}
+
+	public toString(): string {
+		if (this.isSingleCell()) {
+			return this.#tl.toString();
+		}
+		return `${this.#tl.toString()}:${this.#br.toString()}`;
 	}
 }

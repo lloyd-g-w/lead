@@ -26,6 +26,10 @@ export class Position {
 		return refToStr(this.row, this.col);
 	}
 
+	public toString(): string {
+		return this.str();
+	}
+
 	public equals(other: CellRef | null | undefined): boolean {
 		return !!other && this.row === other.row && this.col === other.col;
 	}

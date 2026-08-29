@@ -1,3 +1,4 @@
+// TODO: Should limit this to a certain number of entries
 let vimHistory = new Array<VimCommand>();
 
 let vimState: VimState = {
@@ -14,9 +15,16 @@ export interface VimListener {
 
 export type VimModifier = number;
 
-export type VimMotion = 'up' | 'down' | 'left' | 'right';
+export type VimMotion = 'up' | 'down' | 'left' | 'right' | 'top' | 'bottom' | 'start' | 'end';
 
-export type VimAction = 'delete' | 'insert-mode' | 'visual-mode' | 'escape' | 'goto';
+export type VimAction =
+	| 'delete'
+	| 'insert-mode'
+	| 'visual-mode'
+	| 'escape'
+	| 'goto'
+	| 'submit'
+	| 'show-error';
 
 export interface VimState {
 	modifier?: VimModifier;
@@ -30,6 +38,10 @@ export interface VimCommand {
 }
 
 function emitVimCommand(command: VimCommand): void {
+	if (command.action !== 'escape') {
+		vimHistory.push(command);
+	}
+
 	for (let key in vimCommandListeners) {
 		vimCommandListeners[key].onVimCommand(command);
 	}
@@ -63,7 +75,7 @@ export function getVimId(): string {
 	return id;
 }
 
-export function vimKeyboardHandler(e: KeyboardEvent): void {
+export function vimNormalModeKeyboardHandler(e: KeyboardEvent): void {
 	const motionMap: Record<string, VimMotion> = {
 		h: 'left',
 		j: 'down',
@@ -73,6 +85,7 @@ export function vimKeyboardHandler(e: KeyboardEvent): void {
 
 	switch (e.key) {
 		case 'i':
+		case 'a':
 			emitVimCommand({ action: 'insert-mode' });
 			resetVimState();
 			e.preventDefault();
@@ -85,7 +98,20 @@ export function vimKeyboardHandler(e: KeyboardEvent): void {
 			break;
 
 		case 'g':
+			if (vimState.action === 'goto') {
+				emitVimCommand({ action: 'goto', motion: 'top' });
+				resetVimState();
+				e.preventDefault();
+				return;
+			}
 			vimState.action = 'goto';
+			e.preventDefault();
+			break;
+
+		case 'd':
+		case 'x':
+			emitVimCommand({ action: 'delete' });
+			resetVimState();
 			e.preventDefault();
 			break;
 
@@ -123,7 +149,8 @@ export function vimKeyboardHandler(e: KeyboardEvent): void {
 		case '9':
 			if (vimState.modifier === undefined) {
 				if (e.key === '0') {
-					// Leading zero, ignore
+					// Leading zero means goto start
+					emitVimCommand({ action: 'goto', motion: 'start' });
 					e.preventDefault();
 					break;
 				}
@@ -136,6 +163,29 @@ export function vimKeyboardHandler(e: KeyboardEvent): void {
 
 		case 'Escape':
 			emitVimCommand({ action: 'escape' });
+			resetVimState();
+			e.preventDefault();
+			break;
+		case 'K':
+			emitVimCommand({ action: 'show-error' });
+			resetVimState();
+			e.preventDefault();
+			break;
+
+		default:
+			return;
+	}
+}
+
+export function vimInsertModeKeyboardHandler(e: KeyboardEvent): void {
+	switch (e.key) {
+		case 'Escape':
+			emitVimCommand({ action: 'escape' });
+			resetVimState();
+			e.preventDefault();
+
+		case 'Enter':
+			emitVimCommand({ action: 'submit' });
 			resetVimState();
 			e.preventDefault();
 

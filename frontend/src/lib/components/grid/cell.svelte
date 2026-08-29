@@ -9,6 +9,8 @@
 		cla = '',
 		pos,
 		onmousedown = () => {},
+		ondblclick = () => {},
+		showErrorTooltip = false,
 		grid
 	}: {
 		cla?: string;
@@ -17,13 +19,11 @@
 		grid: Grid;
 		pos: Position;
 		onmousedown?: (e: MouseEvent) => void;
+		ondblclick?: (e: MouseEvent) => void;
+		showErrorTooltip?: boolean;
 	} = $props();
 
 	let cell = $derived(grid.getCell(pos));
-	// let active = $derived(grid.isActive(pos));
-	// let primaryactive = $derived(grid.isPrimaryActive(pos));
-	// let editing = $derived(grid.isEditing(pos));
-	// let externalediting = $derived(grid.isExternalEditing(pos));
 	let width = $derived(grid.getColWidth(pos.col));
 	let height = $derived(grid.getRowHeight(pos.row));
 	let showPreview = $derived(getPreview() !== '');
@@ -81,24 +81,42 @@
 		</div>
 	</div>
 {:else if cell && isErr(cell.eval)}
-	<HoverCard.Root openDelay={500} closeDelay={100}>
-		<HoverCard.Trigger>
-			{@render InnerCell()}
-		</HoverCard.Trigger>
-		<HoverCard.Content side="right">
-			<h2 class="text-md font-semibold tracking-tight transition-colors">
-				{getErrTitle(cell.eval)}
-			</h2>
-			{getErrDesc(cell.eval)}
-		</HoverCard.Content>
-	</HoverCard.Root>
+	{#if showErrorTooltip}
+		<HoverCard.Root open={true} openDelay={0} closeDelay={0}>
+			<HoverCard.Trigger>
+				{@render InnerCell()}
+			</HoverCard.Trigger>
+			<HoverCard.Content side="right" class="text-xs tracking-tight transition-colors p-3 max-w-50">
+				<h2 class="font-semibold">
+					{getErrTitle(cell.eval)}
+				</h2>
+				<h2>
+					{getErrDesc(cell.eval)}
+				</h2>
+			</HoverCard.Content>
+		</HoverCard.Root>
+	{:else}
+		<HoverCard.Root openDelay={500} closeDelay={100}>
+			<HoverCard.Trigger>
+				{@render InnerCell()}
+			</HoverCard.Trigger>
+			<HoverCard.Content side="right" class="text-xs tracking-tight transition-colors p-3 max-w-50">
+				<h2 class="font-semibold">
+					{getErrTitle(cell.eval)}
+				</h2>
+				<h2>
+					{getErrDesc(cell.eval)}
+				</h2>
+			</HoverCard.Content>
+		</HoverCard.Root>
+	{/if}
 {:else}
 	{@render InnerCell()}
 {/if}
 
 {#snippet InnerCell()}
 	<div
-		ondblclick={() => {}}
+		{ondblclick}
 		{onmousedown}
 		data-row={pos.row}
 		data-col={pos.col}
@@ -106,17 +124,19 @@
 		style:width={width + 'px'}
 		style:height={height + 'px'}
 		class={clsx(
-			'placeholder bg-background p-1',
+			'placeholder bg-background px-1',
 
 			cla
 		)}
 	>
 		{#if cell && (cell.raw !== '' || getEvalLiteral(cell.eval) !== '')}
 			<span
-				class={clsx('pointer-events-none select-none', {
+				class={clsx('pointer-events-none flex h-full items-center  text-xs select-none', {
 					err: isErr(cell.eval)
 				})}
 			>
+				<!-- {cell.raw} -->
+				{getEvalLiteral(cell.eval)}
 				<!-- {#if externalediting} -->
 				<!-- 	{cell.temp_raw} -->
 				<!-- {:else if cell.eval} -->

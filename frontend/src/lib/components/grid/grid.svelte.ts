@@ -8,6 +8,7 @@ class Grid {
 	socket: WebSocket;
 
 	mode: GridMode = $state(new NormalMode(this, new Position(0, 0)));
+	errorTooltipPos: Position | null = $state(null);
 
 	defaults: GridDefaults;
 
@@ -20,6 +21,10 @@ class Grid {
 
 	init() {
 		this.mode.init();
+	}
+
+	public setErrorTooltip(pos: Position | null) {
+		this.errorTooltipPos = pos;
 	}
 
 	public getCell(pos: Position): CellT | undefined {
@@ -45,6 +50,17 @@ class Grid {
 			raw: cell.temp_raw
 		};
 
+		this.socket.send(JSON.stringify(msg));
+	}
+
+	public clearCell(pos: Position | null | undefined) {
+		if (pos === null || pos === undefined) return;
+		delete this.data.cells[pos.key()];
+		let msg: LeadMsg = {
+			msg_type: 'set',
+			cell: pos.ref(),
+			raw: ''
+		};
 		this.socket.send(JSON.stringify(msg));
 	}
 
@@ -77,10 +93,6 @@ class Grid {
 			temp_eval: undefined
 		};
 	}
-
-	// public clearActive() {
-	// 	this.setActive(null, null);
-	// }
 
 	public getRowHeight(row: number) {
 		return this.data.row_heights[row] ?? this.defaults.row_height;
@@ -297,6 +309,35 @@ class Grid {
 	// public anyIsActive(): boolean {
 	// 	return this.primary_active !== null && this.secondary_active !== null;
 	// }
+	public getLastRowAfterPx(start: number, px: number): number {
+		let total = this.getDefaultColWidth();
+		let r = start;
+		while (total < px) {
+			total += this.getRowHeight(r);
+			r += 1;
+		}
+		return r + 3;
+	}
+
+	public getRowAfterPx(start: number, px: number): number {
+		let total = 0;
+		let r = Math.max(0, start);
+		while (r > 0 && total < px) {
+			total += this.getRowHeight(r);
+			r -= 1;
+		}
+		return r;
+	}
+
+	public getLastColAfterPx(start: number, px: number): number {
+		let total = this.getDefaultRowHeight();
+		let c = start;
+		while (total < px) {
+			total += this.getColWidth(c);
+			c += 1;
+		}
+		return c;
+	}
 
 	public quickEval(pos: Position | null, raw: string) {
 		if (pos === null) return;

@@ -2,8 +2,10 @@
 	import clsx from 'clsx';
 
 	let {
-		width = 80,
-		height = 30,
+		width = 100,
+		height = 20,
+		defaultHeight = 20,
+		defaultWidth = 100,
 		setColWidth = () => {},
 		setRowHeight = () => {},
 		val,
@@ -13,6 +15,8 @@
 	}: {
 		width?: number;
 		height?: number;
+		defaultHeight?: number;
+		defaultWidth?: number;
 		setColWidth?: (width: number) => void;
 		setRowHeight?: (height: number) => void;
 		val: string;
@@ -38,12 +42,12 @@
 		const handleMouseMove = (moveEvent: MouseEvent) => {
 			if (direction === 'col') {
 				const dx = moveEvent.clientX - startX;
-				// Enforce a minimum width of 40px
-				setColWidth(Math.max(40, startWidth + dx));
+				// Enforce a minimum width of width / 2 px
+				setColWidth(Math.max(defaultWidth / 2, startWidth + dx));
 			} else {
 				const dy = moveEvent.clientY - startY;
-				// Enforce a minimum height of 20px
-				setRowHeight(Math.max(30, startHeight + dy));
+				// Enforce a minimum height of height px
+				setRowHeight(Math.max(defaultHeight, startHeight + dy));
 			}
 		};
 

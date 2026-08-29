@@ -163,6 +163,7 @@ fn evaluate_expr(
             "PROD" => {
                 eval_numeric_func(args, precs, grid, |nums| Ok(nums.iter().product()), "PROD")?
             }
+            "POW" => eval_pow(args, precs, grid)?,
             "MAX" => eval_numeric_func(
                 args,
                 precs,
